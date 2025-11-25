@@ -1,0 +1,502 @@
+Terminals unused in grammar
+
+    ERROR
+
+
+Grammar
+
+    0 $accept: program $end
+
+    1 program: ε
+    2        | program line
+
+    3 line: NEWLINE
+    4     | declaration NEWLINE
+    5     | constraint NEWLINE
+    6     | error NEWLINE
+
+    7 declaration: DECL visibility var_list
+
+    8 visibility: PRIVATE
+    9           | PUBLIC
+   10           | DEFERRED
+
+   11 var_list: var_decl
+   12         | var_list COMMA var_decl
+
+   13 var_decl: IDENTIFIER
+   14         | IDENTIFIER LBRACKET array_size RBRACKET
+
+   15 array_size: NUMBER
+
+   16 constraint: IDENTIFIER ASSIGN expression EQ_OP expression
+   17           | IDENTIFIER ASSIGN expression
+   18           | expression EQ_OP expression
+
+   19 expression: term
+   20           | expression PLUS term
+   21           | expression MINUS term
+   22           | term MULT term
+
+   23 term: IDENTIFIER
+   24     | IDENTIFIER LBRACKET NUMBER RBRACKET
+   25     | NUMBER
+
+
+Terminals, with rules where they appear
+
+    $end (0) 0
+    error (256) 6
+    DECL (258) 7
+    PRIVATE (259) 8
+    PUBLIC (260) 9
+    DEFERRED (261) 10
+    EQ_OP (262) 16 18
+    ASSIGN (263) 16 17
+    PLUS (264) 20
+    MINUS (265) 21
+    MULT (266) 22
+    LBRACKET (267) 14 24
+    RBRACKET (268) 14 24
+    COMMA (269) 12
+    IDENTIFIER <str_val> (270) 13 14 16 17 23 24
+    NUMBER <str_val> (271) 15 24 25
+    NEWLINE (272) 3 4 5 6
+    ERROR (273)
+
+
+Nonterminals, with rules where they appear
+
+    $accept (19)
+        on left: 0
+    program (20)
+        on left: 1 2
+        on right: 0 2
+    line (21)
+        on left: 3 4 5 6
+        on right: 2
+    declaration (22)
+        on left: 7
+        on right: 4
+    visibility <str_val> (23)
+        on left: 8 9 10
+        on right: 7
+    var_list (24)
+        on left: 11 12
+        on right: 7 12
+    var_decl (25)
+        on left: 13 14
+        on right: 11 12
+    array_size <int_val> (26)
+        on left: 15
+        on right: 14
+    constraint (27)
+        on left: 16 17 18
+        on right: 5
+    expression (28)
+        on left: 19 20 21 22
+        on right: 16 17 18 20 21
+    term (29)
+        on left: 23 24 25
+        on right: 19 20 21 22
+
+
+State 0
+
+    0 $accept: • program $end
+
+    $default  reduce using rule 1 (program)
+
+    program  go to state 1
+
+
+State 1
+
+    0 $accept: program • $end
+    2 program: program • line
+
+    $end        shift, and go to state 2
+    error       shift, and go to state 3
+    DECL        shift, and go to state 4
+    IDENTIFIER  shift, and go to state 5
+    NUMBER      shift, and go to state 6
+    NEWLINE     shift, and go to state 7
+
+    line         go to state 8
+    declaration  go to state 9
+    constraint   go to state 10
+    expression   go to state 11
+    term         go to state 12
+
+
+State 2
+
+    0 $accept: program $end •
+
+    $default  accept
+
+
+State 3
+
+    6 line: error • NEWLINE
+
+    NEWLINE  shift, and go to state 13
+
+
+State 4
+
+    7 declaration: DECL • visibility var_list
+
+    PRIVATE   shift, and go to state 14
+    PUBLIC    shift, and go to state 15
+    DEFERRED  shift, and go to state 16
+
+    visibility  go to state 17
+
+
+State 5
+
+   16 constraint: IDENTIFIER • ASSIGN expression EQ_OP expression
+   17           | IDENTIFIER • ASSIGN expression
+   23 term: IDENTIFIER •
+   24     | IDENTIFIER • LBRACKET NUMBER RBRACKET
+
+    ASSIGN    shift, and go to state 18
+    LBRACKET  shift, and go to state 19
+
+    $default  reduce using rule 23 (term)
+
+
+State 6
+
+   25 term: NUMBER •
+
+    $default  reduce using rule 25 (term)
+
+
+State 7
+
+    3 line: NEWLINE •
+
+    $default  reduce using rule 3 (line)
+
+
+State 8
+
+    2 program: program line •
+
+    $default  reduce using rule 2 (program)
+
+
+State 9
+
+    4 line: declaration • NEWLINE
+
+    NEWLINE  shift, and go to state 20
+
+
+State 10
+
+    5 line: constraint • NEWLINE
+
+    NEWLINE  shift, and go to state 21
+
+
+State 11
+
+   18 constraint: expression • EQ_OP expression
+   20 expression: expression • PLUS term
+   21           | expression • MINUS term
+
+    EQ_OP  shift, and go to state 22
+    PLUS   shift, and go to state 23
+    MINUS  shift, and go to state 24
+
+
+State 12
+
+   19 expression: term •
+   22           | term • MULT term
+
+    MULT  shift, and go to state 25
+
+    $default  reduce using rule 19 (expression)
+
+
+State 13
+
+    6 line: error NEWLINE •
+
+    $default  reduce using rule 6 (line)
+
+
+State 14
+
+    8 visibility: PRIVATE •
+
+    $default  reduce using rule 8 (visibility)
+
+
+State 15
+
+    9 visibility: PUBLIC •
+
+    $default  reduce using rule 9 (visibility)
+
+
+State 16
+
+   10 visibility: DEFERRED •
+
+    $default  reduce using rule 10 (visibility)
+
+
+State 17
+
+    7 declaration: DECL visibility • var_list
+
+    IDENTIFIER  shift, and go to state 26
+
+    var_list  go to state 27
+    var_decl  go to state 28
+
+
+State 18
+
+   16 constraint: IDENTIFIER ASSIGN • expression EQ_OP expression
+   17           | IDENTIFIER ASSIGN • expression
+
+    IDENTIFIER  shift, and go to state 29
+    NUMBER      shift, and go to state 6
+
+    expression  go to state 30
+    term        go to state 12
+
+
+State 19
+
+   24 term: IDENTIFIER LBRACKET • NUMBER RBRACKET
+
+    NUMBER  shift, and go to state 31
+
+
+State 20
+
+    4 line: declaration NEWLINE •
+
+    $default  reduce using rule 4 (line)
+
+
+State 21
+
+    5 line: constraint NEWLINE •
+
+    $default  reduce using rule 5 (line)
+
+
+State 22
+
+   18 constraint: expression EQ_OP • expression
+
+    IDENTIFIER  shift, and go to state 29
+    NUMBER      shift, and go to state 6
+
+    expression  go to state 32
+    term        go to state 12
+
+
+State 23
+
+   20 expression: expression PLUS • term
+
+    IDENTIFIER  shift, and go to state 29
+    NUMBER      shift, and go to state 6
+
+    term  go to state 33
+
+
+State 24
+
+   21 expression: expression MINUS • term
+
+    IDENTIFIER  shift, and go to state 29
+    NUMBER      shift, and go to state 6
+
+    term  go to state 34
+
+
+State 25
+
+   22 expression: term MULT • term
+
+    IDENTIFIER  shift, and go to state 29
+    NUMBER      shift, and go to state 6
+
+    term  go to state 35
+
+
+State 26
+
+   13 var_decl: IDENTIFIER •
+   14         | IDENTIFIER • LBRACKET array_size RBRACKET
+
+    LBRACKET  shift, and go to state 36
+
+    $default  reduce using rule 13 (var_decl)
+
+
+State 27
+
+    7 declaration: DECL visibility var_list •
+   12 var_list: var_list • COMMA var_decl
+
+    COMMA  shift, and go to state 37
+
+    $default  reduce using rule 7 (declaration)
+
+
+State 28
+
+   11 var_list: var_decl •
+
+    $default  reduce using rule 11 (var_list)
+
+
+State 29
+
+   23 term: IDENTIFIER •
+   24     | IDENTIFIER • LBRACKET NUMBER RBRACKET
+
+    LBRACKET  shift, and go to state 19
+
+    $default  reduce using rule 23 (term)
+
+
+State 30
+
+   16 constraint: IDENTIFIER ASSIGN expression • EQ_OP expression
+   17           | IDENTIFIER ASSIGN expression •
+   20 expression: expression • PLUS term
+   21           | expression • MINUS term
+
+    EQ_OP  shift, and go to state 38
+    PLUS   shift, and go to state 23
+    MINUS  shift, and go to state 24
+
+    $default  reduce using rule 17 (constraint)
+
+
+State 31
+
+   24 term: IDENTIFIER LBRACKET NUMBER • RBRACKET
+
+    RBRACKET  shift, and go to state 39
+
+
+State 32
+
+   18 constraint: expression EQ_OP expression •
+   20 expression: expression • PLUS term
+   21           | expression • MINUS term
+
+    PLUS   shift, and go to state 23
+    MINUS  shift, and go to state 24
+
+    $default  reduce using rule 18 (constraint)
+
+
+State 33
+
+   20 expression: expression PLUS term •
+
+    $default  reduce using rule 20 (expression)
+
+
+State 34
+
+   21 expression: expression MINUS term •
+
+    $default  reduce using rule 21 (expression)
+
+
+State 35
+
+   22 expression: term MULT term •
+
+    $default  reduce using rule 22 (expression)
+
+
+State 36
+
+   14 var_decl: IDENTIFIER LBRACKET • array_size RBRACKET
+
+    NUMBER  shift, and go to state 40
+
+    array_size  go to state 41
+
+
+State 37
+
+   12 var_list: var_list COMMA • var_decl
+
+    IDENTIFIER  shift, and go to state 26
+
+    var_decl  go to state 42
+
+
+State 38
+
+   16 constraint: IDENTIFIER ASSIGN expression EQ_OP • expression
+
+    IDENTIFIER  shift, and go to state 29
+    NUMBER      shift, and go to state 6
+
+    expression  go to state 43
+    term        go to state 12
+
+
+State 39
+
+   24 term: IDENTIFIER LBRACKET NUMBER RBRACKET •
+
+    $default  reduce using rule 24 (term)
+
+
+State 40
+
+   15 array_size: NUMBER •
+
+    $default  reduce using rule 15 (array_size)
+
+
+State 41
+
+   14 var_decl: IDENTIFIER LBRACKET array_size • RBRACKET
+
+    RBRACKET  shift, and go to state 44
+
+
+State 42
+
+   12 var_list: var_list COMMA var_decl •
+
+    $default  reduce using rule 12 (var_list)
+
+
+State 43
+
+   16 constraint: IDENTIFIER ASSIGN expression EQ_OP expression •
+   20 expression: expression • PLUS term
+   21           | expression • MINUS term
+
+    PLUS   shift, and go to state 23
+    MINUS  shift, and go to state 24
+
+    $default  reduce using rule 16 (constraint)
+
+
+State 44
+
+   14 var_decl: IDENTIFIER LBRACKET array_size RBRACKET •
+
+    $default  reduce using rule 14 (var_decl)

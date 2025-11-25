@@ -1,0 +1,8 @@
+# Semantic error: using gate variable before it's assigned
+decl private x
+
+# 'gate1' hasn't been assigned yet, but is used here
+result = gate1 + x
+
+# Now assign gate1 (too late)
+gate1 = x + 1

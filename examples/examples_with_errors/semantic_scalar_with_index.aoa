@@ -1,0 +1,5 @@
+# Semantic error: indexing a scalar variable
+decl private x
+
+# 'x' is a scalar, cannot be indexed
+result = x[0] + 1

@@ -1,0 +1,5 @@
+# Semantic error: using array without index
+decl private a[4]
+
+# Array 'a' must be accessed with index like a[0]
+result = a + 1

@@ -1,0 +1,5 @@
+# Syntax error: missing bracket in expression
+decl private a[4], b[4]
+
+# Missing closing bracket in complex expression
+x = a[0 + b[1]

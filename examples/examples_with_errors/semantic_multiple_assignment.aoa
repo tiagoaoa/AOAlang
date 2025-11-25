@@ -1,0 +1,8 @@
+# Semantic error: multiple assignments to same gate
+decl private x
+
+# First assignment to gate
+result = x + 1
+
+# Second assignment to same gate (violates single assignment rule)
+result = x + 2

@@ -1,0 +1,264 @@
+# 16-bit unsigned integer greater-than comparison
+# Tests whether a > b where a is private, b is public
+# Result is 1 if a > b, 0 otherwise
+
+# ========== DECLARATIONS ==========
+
+decl private a[16]
+decl deferred b[16]
+decl deferred result
+
+decl private diff0
+decl private diff1
+decl private diff2
+decl private diff3
+decl private diff4
+decl private diff5
+decl private diff6
+decl private diff7
+decl private diff8
+decl private diff9
+decl private diff10
+decl private diff11
+decl private diff12
+decl private diff13
+decl private diff14
+decl private diff15
+
+decl private borrow0
+decl private borrow1
+decl private borrow2
+decl private borrow3
+decl private borrow4
+decl private borrow5
+decl private borrow6
+decl private borrow7
+decl private borrow8
+decl private borrow9
+decl private borrow10
+decl private borrow11
+decl private borrow12
+decl private borrow13
+decl private borrow14
+decl private borrow15
+
+decl private no_borrow
+
+# ========== CONSTRAINTS ==========
+
+# Binary constraints: enforce all bits are 0 or 1
+a0_minus_1 = a[0] - 1
+a0_check = a[0] * a0_minus_1
+a0_zero = a0_check == 0
+
+a1_minus_1 = a[1] - 1
+a1_check = a[1] * a1_minus_1
+a1_zero = a1_check == 0
+
+a2_minus_1 = a[2] - 1
+a2_check = a[2] * a2_minus_1
+a2_zero = a2_check == 0
+
+a3_minus_1 = a[3] - 1
+a3_check = a[3] * a3_minus_1
+a3_zero = a3_check == 0
+
+a4_minus_1 = a[4] - 1
+a4_check = a[4] * a4_minus_1
+a4_zero = a4_check == 0
+
+a5_minus_1 = a[5] - 1
+a5_check = a[5] * a5_minus_1
+a5_zero = a5_check == 0
+
+a6_minus_1 = a[6] - 1
+a6_check = a[6] * a6_minus_1
+a6_zero = a6_check == 0
+
+a7_minus_1 = a[7] - 1
+a7_check = a[7] * a7_minus_1
+a7_zero = a7_check == 0
+
+a8_minus_1 = a[8] - 1
+a8_check = a[8] * a8_minus_1
+a8_zero = a8_check == 0
+
+a9_minus_1 = a[9] - 1
+a9_check = a[9] * a9_minus_1
+a9_zero = a9_check == 0
+
+a10_minus_1 = a[10] - 1
+a10_check = a[10] * a10_minus_1
+a10_zero = a10_check == 0
+
+a11_minus_1 = a[11] - 1
+a11_check = a[11] * a11_minus_1
+a11_zero = a11_check == 0
+
+a12_minus_1 = a[12] - 1
+a12_check = a[12] * a12_minus_1
+a12_zero = a12_check == 0
+
+a13_minus_1 = a[13] - 1
+a13_check = a[13] * a13_minus_1
+a13_zero = a13_check == 0
+
+a14_minus_1 = a[14] - 1
+a14_check = a[14] * a14_minus_1
+a14_zero = a14_check == 0
+
+a15_minus_1 = a[15] - 1
+a15_check = a[15] * a15_minus_1
+a15_zero = a15_check == 0
+
+b0_minus_1 = b[0] - 1
+b0_check = b[0] * b0_minus_1
+b0_zero = b0_check == 0
+
+b1_minus_1 = b[1] - 1
+b1_check = b[1] * b1_minus_1
+b1_zero = b1_check == 0
+
+b2_minus_1 = b[2] - 1
+b2_check = b[2] * b2_minus_1
+b2_zero = b2_check == 0
+
+b3_minus_1 = b[3] - 1
+b3_check = b[3] * b3_minus_1
+b3_zero = b3_check == 0
+
+b4_minus_1 = b[4] - 1
+b4_check = b[4] * b4_minus_1
+b4_zero = b4_check == 0
+
+b5_minus_1 = b[5] - 1
+b5_check = b[5] * b5_minus_1
+b5_zero = b5_check == 0
+
+b6_minus_1 = b[6] - 1
+b6_check = b[6] * b6_minus_1
+b6_zero = b6_check == 0
+
+b7_minus_1 = b[7] - 1
+b7_check = b[7] * b7_minus_1
+b7_zero = b7_check == 0
+
+b8_minus_1 = b[8] - 1
+b8_check = b[8] * b8_minus_1
+b8_zero = b8_check == 0
+
+b9_minus_1 = b[9] - 1
+b9_check = b[9] * b9_minus_1
+b9_zero = b9_check == 0
+
+b10_minus_1 = b[10] - 1
+b10_check = b[10] * b10_minus_1
+b10_zero = b10_check == 0
+
+b11_minus_1 = b[11] - 1
+b11_check = b[11] * b11_minus_1
+b11_zero = b11_check == 0
+
+b12_minus_1 = b[12] - 1
+b12_check = b[12] * b12_minus_1
+b12_zero = b12_check == 0
+
+b13_minus_1 = b[13] - 1
+b13_check = b[13] * b13_minus_1
+b13_zero = b13_check == 0
+
+b14_minus_1 = b[14] - 1
+b14_check = b[14] * b14_minus_1
+b14_zero = b14_check == 0
+
+b15_minus_1 = b[15] - 1
+b15_check = b[15] * b15_minus_1
+b15_zero = b15_check == 0
+
+result_minus_1 = result - 1
+result_check = result * result_minus_1
+result_zero = result_check == 0
+
+# Bitwise subtraction: a - b
+diff0 = a[0] - b[0]
+borrow0_doubled = borrow0 + borrow0
+sum0 = diff0 + borrow0_doubled
+
+temp1 = a[1] - b[1]
+diff1 = temp1 - borrow0
+borrow1_doubled = borrow1 + borrow1
+sum1 = diff1 + borrow1_doubled
+
+temp2 = a[2] - b[2]
+diff2 = temp2 - borrow1
+borrow2_doubled = borrow2 + borrow2
+sum2 = diff2 + borrow2_doubled
+
+temp3 = a[3] - b[3]
+diff3 = temp3 - borrow2
+borrow3_doubled = borrow3 + borrow3
+sum3 = diff3 + borrow3_doubled
+
+temp4 = a[4] - b[4]
+diff4 = temp4 - borrow3
+borrow4_doubled = borrow4 + borrow4
+sum4 = diff4 + borrow4_doubled
+
+temp5 = a[5] - b[5]
+diff5 = temp5 - borrow4
+borrow5_doubled = borrow5 + borrow5
+sum5 = diff5 + borrow5_doubled
+
+temp6 = a[6] - b[6]
+diff6 = temp6 - borrow5
+borrow6_doubled = borrow6 + borrow6
+sum6 = diff6 + borrow6_doubled
+
+temp7 = a[7] - b[7]
+diff7 = temp7 - borrow6
+borrow7_doubled = borrow7 + borrow7
+sum7 = diff7 + borrow7_doubled
+
+temp8 = a[8] - b[8]
+diff8 = temp8 - borrow7
+borrow8_doubled = borrow8 + borrow8
+sum8 = diff8 + borrow8_doubled
+
+temp9 = a[9] - b[9]
+diff9 = temp9 - borrow8
+borrow9_doubled = borrow9 + borrow9
+sum9 = diff9 + borrow9_doubled
+
+temp10 = a[10] - b[10]
+diff10 = temp10 - borrow9
+borrow10_doubled = borrow10 + borrow10
+sum10 = diff10 + borrow10_doubled
+
+temp11 = a[11] - b[11]
+diff11 = temp11 - borrow10
+borrow11_doubled = borrow11 + borrow11
+sum11 = diff11 + borrow11_doubled
+
+temp12 = a[12] - b[12]
+diff12 = temp12 - borrow11
+borrow12_doubled = borrow12 + borrow12
+sum12 = diff12 + borrow12_doubled
+
+temp13 = a[13] - b[13]
+diff13 = temp13 - borrow12
+borrow13_doubled = borrow13 + borrow13
+sum13 = diff13 + borrow13_doubled
+
+temp14 = a[14] - b[14]
+diff14 = temp14 - borrow13
+borrow14_doubled = borrow14 + borrow14
+sum14 = diff14 + borrow14_doubled
+
+temp15 = a[15] - b[15]
+diff15 = temp15 - borrow14
+borrow15_doubled = borrow15 + borrow15
+sum15 = diff15 + borrow15_doubled
+
+# Check result: a > b iff no borrow (borrow15 = 0)
+no_borrow = 1 - borrow15
+final_check = result == no_borrow

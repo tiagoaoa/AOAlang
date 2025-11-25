@@ -1,0 +1,55 @@
+# Compiled binaries
+bin/
+aoac
+
+# Object files
+*.o
+*.obj
+
+# Generated parser/lexer files
+src/aoa.tab.c
+src/aoa.tab.h
+src/lex.yy.c
+
+# Editor backup files
+*~
+*.swp
+*.swo
+.*.sw?
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Debug files
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+# IDE files
+.vscode/
+.idea/
+*.sublime-*
+
+# Build artifacts
+*.a
+*.la
+*.so
+*.dylib
+*.dll
+
+# Autotools
+autom4te.cache/
+config.log
+config.status
+Makefile.in
+aclocal.m4
+compile
+depcomp
+install-sh
+missing
+
+# Test output
+test-output/
+*.test

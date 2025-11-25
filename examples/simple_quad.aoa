@@ -1,0 +1,24 @@
+decl private x[1]
+decl deferred a[2], b[2]
+
+# a_val = a[0] + 2*a[1]  (0-3)
+two_a1 = a[1] + a[1]
+a_val = a[0] + two_a1
+
+# b_val = b[0] + 2*b[1]  (0-3)
+two_b1 = b[1] + b[1]
+b_val = b[0] + two_b1
+
+# Compute x^2
+x_squared = x[0] * x[0]
+
+# Compute a*x
+ax = a_val * x[0]
+
+# Compute x^2 + a*x + b
+sum1 = x_squared + ax
+poly_result = sum1 + b_val
+
+# Enforce poly_result == 0
+zero_const = 0
+check = poly_result == zero_const

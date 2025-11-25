@@ -1,0 +1,5 @@
+# Semantic error: array index out of bounds
+decl private a[4]
+
+# Array 'a' has size 4 (indices 0-3), index 10 is out of bounds
+result = a[10] + 1

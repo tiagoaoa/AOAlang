@@ -1,0 +1,39 @@
+# Quadratic circuit: prove x^2 + a*x + b = 0
+# Public: a[0..3], b[0..3] (8 bits total, 256 combinations)
+# Private: x
+# Non-trivial discriminant: depends on (a,b)
+
+decl private x
+decl deferred a[4], b[4]
+
+# Reconstruct a from bits: a_val = a[0] + 2*a[1] + 4*a[2] + 8*a[3]
+two_a1 = 2 * a[1]
+four_a2 = 4 * a[2]
+eight_a3 = 8 * a[3]
+a_partial1 = a[0] + two_a1
+a_partial2 = a_partial1 + four_a2
+a_val = a_partial2 + eight_a3
+
+# Reconstruct b from bits: b_val = b[0] + 2*b[1] + 4*b[2] + 8*b[3]
+two_b1 = 2 * b[1]
+four_b2 = 4 * b[2]
+eight_b3 = 8 * b[3]
+b_partial1 = b[0] + two_b1
+b_partial2 = b_partial1 + four_b2
+b_val = b_partial2 + eight_b3
+
+# Compute x^2 (multiplication gate)
+x_squared = x * x
+
+# Compute a*x (multiplication gate)
+ax = a_val * x
+
+# Compute x^2 + a*x
+poly_partial = x_squared + ax
+
+# Compute x^2 + a*x + b
+poly_result = poly_partial + b_val
+
+# Constraint: result must be zero
+# Use equality constraint
+zero_check = poly_result == 0

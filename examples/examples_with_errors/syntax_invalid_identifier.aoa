@@ -1,0 +1,5 @@
+# Syntax error: identifier starts with number
+decl private x
+
+# Invalid identifier on LHS
+123invalid = x + 1

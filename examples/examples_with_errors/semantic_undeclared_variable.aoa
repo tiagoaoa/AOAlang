@@ -1,0 +1,5 @@
+# Semantic error: using undeclared variable
+decl private x
+
+# 'undeclared_var' was never declared
+result = undeclared_var + x

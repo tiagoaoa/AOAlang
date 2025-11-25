@@ -1,0 +1,8 @@
+# Semantic error: declaration after constraints
+decl private x
+
+# Start of constraint section
+result = x + 1
+
+# This declaration comes after constraints (not allowed)
+decl private y

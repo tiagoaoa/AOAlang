@@ -1,0 +1,574 @@
+# 32-bit unsigned integer greater-than comparison
+# Compares if a > b where a and b are 32-bit unsigned integers
+# Implemented as subtraction a - b, checking if there's NO borrow
+# a > b iff a - b doesn't underflow (no final borrow)
+
+decl private a[32]
+decl deferred b[32]
+decl deferred result
+
+# Bit 0 subtraction: a[0] - b[0]
+diff0 = a[0] - b[0]
+not_a0 = 1 - a[0]
+borrow0 = not_a0 * b[0]
+
+# Bit 1 subtraction
+sum_1_ab = a[1] + b[1]
+prod_1_ab = a[1] * b[1]
+prod2_1_ab = prod_1_ab + prod_1_ab
+xor_1_ab = sum_1_ab - prod2_1_ab
+sum_1_final = xor_1_ab + borrow0
+prod_1_final = xor_1_ab * borrow0
+prod2_1_final = prod_1_final + prod_1_final
+diff1 = sum_1_final - prod2_1_final
+not_a1 = 1 - a[1]
+term1_1 = not_a1 * b[1]
+equal_1 = 1 - xor_1_ab
+term2_1 = equal_1 * borrow0
+or_sum_1 = term1_1 + term2_1
+or_prod_1 = term1_1 * term2_1
+or_prod2_1 = or_prod_1 + or_prod_1
+borrow1 = or_sum_1 - or_prod2_1
+
+# Bit 2 subtraction
+sum_2_ab = a[2] + b[2]
+prod_2_ab = a[2] * b[2]
+prod2_2_ab = prod_2_ab + prod_2_ab
+xor_2_ab = sum_2_ab - prod2_2_ab
+sum_2_final = xor_2_ab + borrow1
+prod_2_final = xor_2_ab * borrow1
+prod2_2_final = prod_2_final + prod_2_final
+diff2 = sum_2_final - prod2_2_final
+not_a2 = 1 - a[2]
+term1_2 = not_a2 * b[2]
+equal_2 = 1 - xor_2_ab
+term2_2 = equal_2 * borrow1
+or_sum_2 = term1_2 + term2_2
+or_prod_2 = term1_2 * term2_2
+or_prod2_2 = or_prod_2 + or_prod_2
+borrow2 = or_sum_2 - or_prod2_2
+
+# Bit 3 subtraction
+sum_3_ab = a[3] + b[3]
+prod_3_ab = a[3] * b[3]
+prod2_3_ab = prod_3_ab + prod_3_ab
+xor_3_ab = sum_3_ab - prod2_3_ab
+sum_3_final = xor_3_ab + borrow2
+prod_3_final = xor_3_ab * borrow2
+prod2_3_final = prod_3_final + prod_3_final
+diff3 = sum_3_final - prod2_3_final
+not_a3 = 1 - a[3]
+term1_3 = not_a3 * b[3]
+equal_3 = 1 - xor_3_ab
+term2_3 = equal_3 * borrow2
+or_sum_3 = term1_3 + term2_3
+or_prod_3 = term1_3 * term2_3
+or_prod2_3 = or_prod_3 + or_prod_3
+borrow3 = or_sum_3 - or_prod2_3
+
+# Bit 4 subtraction
+sum_4_ab = a[4] + b[4]
+prod_4_ab = a[4] * b[4]
+prod2_4_ab = prod_4_ab + prod_4_ab
+xor_4_ab = sum_4_ab - prod2_4_ab
+sum_4_final = xor_4_ab + borrow3
+prod_4_final = xor_4_ab * borrow3
+prod2_4_final = prod_4_final + prod_4_final
+diff4 = sum_4_final - prod2_4_final
+not_a4 = 1 - a[4]
+term1_4 = not_a4 * b[4]
+equal_4 = 1 - xor_4_ab
+term2_4 = equal_4 * borrow3
+or_sum_4 = term1_4 + term2_4
+or_prod_4 = term1_4 * term2_4
+or_prod2_4 = or_prod_4 + or_prod_4
+borrow4 = or_sum_4 - or_prod2_4
+
+# Bit 5 subtraction
+sum_5_ab = a[5] + b[5]
+prod_5_ab = a[5] * b[5]
+prod2_5_ab = prod_5_ab + prod_5_ab
+xor_5_ab = sum_5_ab - prod2_5_ab
+sum_5_final = xor_5_ab + borrow4
+prod_5_final = xor_5_ab * borrow4
+prod2_5_final = prod_5_final + prod_5_final
+diff5 = sum_5_final - prod2_5_final
+not_a5 = 1 - a[5]
+term1_5 = not_a5 * b[5]
+equal_5 = 1 - xor_5_ab
+term2_5 = equal_5 * borrow4
+or_sum_5 = term1_5 + term2_5
+or_prod_5 = term1_5 * term2_5
+or_prod2_5 = or_prod_5 + or_prod_5
+borrow5 = or_sum_5 - or_prod2_5
+
+# Bit 6 subtraction
+sum_6_ab = a[6] + b[6]
+prod_6_ab = a[6] * b[6]
+prod2_6_ab = prod_6_ab + prod_6_ab
+xor_6_ab = sum_6_ab - prod2_6_ab
+sum_6_final = xor_6_ab + borrow5
+prod_6_final = xor_6_ab * borrow5
+prod2_6_final = prod_6_final + prod_6_final
+diff6 = sum_6_final - prod2_6_final
+not_a6 = 1 - a[6]
+term1_6 = not_a6 * b[6]
+equal_6 = 1 - xor_6_ab
+term2_6 = equal_6 * borrow5
+or_sum_6 = term1_6 + term2_6
+or_prod_6 = term1_6 * term2_6
+or_prod2_6 = or_prod_6 + or_prod_6
+borrow6 = or_sum_6 - or_prod2_6
+
+# Bit 7 subtraction
+sum_7_ab = a[7] + b[7]
+prod_7_ab = a[7] * b[7]
+prod2_7_ab = prod_7_ab + prod_7_ab
+xor_7_ab = sum_7_ab - prod2_7_ab
+sum_7_final = xor_7_ab + borrow6
+prod_7_final = xor_7_ab * borrow6
+prod2_7_final = prod_7_final + prod_7_final
+diff7 = sum_7_final - prod2_7_final
+not_a7 = 1 - a[7]
+term1_7 = not_a7 * b[7]
+equal_7 = 1 - xor_7_ab
+term2_7 = equal_7 * borrow6
+or_sum_7 = term1_7 + term2_7
+or_prod_7 = term1_7 * term2_7
+or_prod2_7 = or_prod_7 + or_prod_7
+borrow7 = or_sum_7 - or_prod2_7
+
+# Bit 8 subtraction
+sum_8_ab = a[8] + b[8]
+prod_8_ab = a[8] * b[8]
+prod2_8_ab = prod_8_ab + prod_8_ab
+xor_8_ab = sum_8_ab - prod2_8_ab
+sum_8_final = xor_8_ab + borrow7
+prod_8_final = xor_8_ab * borrow7
+prod2_8_final = prod_8_final + prod_8_final
+diff8 = sum_8_final - prod2_8_final
+not_a8 = 1 - a[8]
+term1_8 = not_a8 * b[8]
+equal_8 = 1 - xor_8_ab
+term2_8 = equal_8 * borrow7
+or_sum_8 = term1_8 + term2_8
+or_prod_8 = term1_8 * term2_8
+or_prod2_8 = or_prod_8 + or_prod_8
+borrow8 = or_sum_8 - or_prod2_8
+
+# Bit 9 subtraction
+sum_9_ab = a[9] + b[9]
+prod_9_ab = a[9] * b[9]
+prod2_9_ab = prod_9_ab + prod_9_ab
+xor_9_ab = sum_9_ab - prod2_9_ab
+sum_9_final = xor_9_ab + borrow8
+prod_9_final = xor_9_ab * borrow8
+prod2_9_final = prod_9_final + prod_9_final
+diff9 = sum_9_final - prod2_9_final
+not_a9 = 1 - a[9]
+term1_9 = not_a9 * b[9]
+equal_9 = 1 - xor_9_ab
+term2_9 = equal_9 * borrow8
+or_sum_9 = term1_9 + term2_9
+or_prod_9 = term1_9 * term2_9
+or_prod2_9 = or_prod_9 + or_prod_9
+borrow9 = or_sum_9 - or_prod2_9
+
+# Bit 10 subtraction
+sum_10_ab = a[10] + b[10]
+prod_10_ab = a[10] * b[10]
+prod2_10_ab = prod_10_ab + prod_10_ab
+xor_10_ab = sum_10_ab - prod2_10_ab
+sum_10_final = xor_10_ab + borrow9
+prod_10_final = xor_10_ab * borrow9
+prod2_10_final = prod_10_final + prod_10_final
+diff10 = sum_10_final - prod2_10_final
+not_a10 = 1 - a[10]
+term1_10 = not_a10 * b[10]
+equal_10 = 1 - xor_10_ab
+term2_10 = equal_10 * borrow9
+or_sum_10 = term1_10 + term2_10
+or_prod_10 = term1_10 * term2_10
+or_prod2_10 = or_prod_10 + or_prod_10
+borrow10 = or_sum_10 - or_prod2_10
+
+# Bit 11 subtraction
+sum_11_ab = a[11] + b[11]
+prod_11_ab = a[11] * b[11]
+prod2_11_ab = prod_11_ab + prod_11_ab
+xor_11_ab = sum_11_ab - prod2_11_ab
+sum_11_final = xor_11_ab + borrow10
+prod_11_final = xor_11_ab * borrow10
+prod2_11_final = prod_11_final + prod_11_final
+diff11 = sum_11_final - prod2_11_final
+not_a11 = 1 - a[11]
+term1_11 = not_a11 * b[11]
+equal_11 = 1 - xor_11_ab
+term2_11 = equal_11 * borrow10
+or_sum_11 = term1_11 + term2_11
+or_prod_11 = term1_11 * term2_11
+or_prod2_11 = or_prod_11 + or_prod_11
+borrow11 = or_sum_11 - or_prod2_11
+
+# Bit 12 subtraction
+sum_12_ab = a[12] + b[12]
+prod_12_ab = a[12] * b[12]
+prod2_12_ab = prod_12_ab + prod_12_ab
+xor_12_ab = sum_12_ab - prod2_12_ab
+sum_12_final = xor_12_ab + borrow11
+prod_12_final = xor_12_ab * borrow11
+prod2_12_final = prod_12_final + prod_12_final
+diff12 = sum_12_final - prod2_12_final
+not_a12 = 1 - a[12]
+term1_12 = not_a12 * b[12]
+equal_12 = 1 - xor_12_ab
+term2_12 = equal_12 * borrow11
+or_sum_12 = term1_12 + term2_12
+or_prod_12 = term1_12 * term2_12
+or_prod2_12 = or_prod_12 + or_prod_12
+borrow12 = or_sum_12 - or_prod2_12
+
+# Bit 13 subtraction
+sum_13_ab = a[13] + b[13]
+prod_13_ab = a[13] * b[13]
+prod2_13_ab = prod_13_ab + prod_13_ab
+xor_13_ab = sum_13_ab - prod2_13_ab
+sum_13_final = xor_13_ab + borrow12
+prod_13_final = xor_13_ab * borrow12
+prod2_13_final = prod_13_final + prod_13_final
+diff13 = sum_13_final - prod2_13_final
+not_a13 = 1 - a[13]
+term1_13 = not_a13 * b[13]
+equal_13 = 1 - xor_13_ab
+term2_13 = equal_13 * borrow12
+or_sum_13 = term1_13 + term2_13
+or_prod_13 = term1_13 * term2_13
+or_prod2_13 = or_prod_13 + or_prod_13
+borrow13 = or_sum_13 - or_prod2_13
+
+# Bit 14 subtraction
+sum_14_ab = a[14] + b[14]
+prod_14_ab = a[14] * b[14]
+prod2_14_ab = prod_14_ab + prod_14_ab
+xor_14_ab = sum_14_ab - prod2_14_ab
+sum_14_final = xor_14_ab + borrow13
+prod_14_final = xor_14_ab * borrow13
+prod2_14_final = prod_14_final + prod_14_final
+diff14 = sum_14_final - prod2_14_final
+not_a14 = 1 - a[14]
+term1_14 = not_a14 * b[14]
+equal_14 = 1 - xor_14_ab
+term2_14 = equal_14 * borrow13
+or_sum_14 = term1_14 + term2_14
+or_prod_14 = term1_14 * term2_14
+or_prod2_14 = or_prod_14 + or_prod_14
+borrow14 = or_sum_14 - or_prod2_14
+
+# Bit 15 subtraction
+sum_15_ab = a[15] + b[15]
+prod_15_ab = a[15] * b[15]
+prod2_15_ab = prod_15_ab + prod_15_ab
+xor_15_ab = sum_15_ab - prod2_15_ab
+sum_15_final = xor_15_ab + borrow14
+prod_15_final = xor_15_ab * borrow14
+prod2_15_final = prod_15_final + prod_15_final
+diff15 = sum_15_final - prod2_15_final
+not_a15 = 1 - a[15]
+term1_15 = not_a15 * b[15]
+equal_15 = 1 - xor_15_ab
+term2_15 = equal_15 * borrow14
+or_sum_15 = term1_15 + term2_15
+or_prod_15 = term1_15 * term2_15
+or_prod2_15 = or_prod_15 + or_prod_15
+borrow15 = or_sum_15 - or_prod2_15
+
+# Bit 16 subtraction
+sum_16_ab = a[16] + b[16]
+prod_16_ab = a[16] * b[16]
+prod2_16_ab = prod_16_ab + prod_16_ab
+xor_16_ab = sum_16_ab - prod2_16_ab
+sum_16_final = xor_16_ab + borrow15
+prod_16_final = xor_16_ab * borrow15
+prod2_16_final = prod_16_final + prod_16_final
+diff16 = sum_16_final - prod2_16_final
+not_a16 = 1 - a[16]
+term1_16 = not_a16 * b[16]
+equal_16 = 1 - xor_16_ab
+term2_16 = equal_16 * borrow15
+or_sum_16 = term1_16 + term2_16
+or_prod_16 = term1_16 * term2_16
+or_prod2_16 = or_prod_16 + or_prod_16
+borrow16 = or_sum_16 - or_prod2_16
+
+# Bit 17 subtraction
+sum_17_ab = a[17] + b[17]
+prod_17_ab = a[17] * b[17]
+prod2_17_ab = prod_17_ab + prod_17_ab
+xor_17_ab = sum_17_ab - prod2_17_ab
+sum_17_final = xor_17_ab + borrow16
+prod_17_final = xor_17_ab * borrow16
+prod2_17_final = prod_17_final + prod_17_final
+diff17 = sum_17_final - prod2_17_final
+not_a17 = 1 - a[17]
+term1_17 = not_a17 * b[17]
+equal_17 = 1 - xor_17_ab
+term2_17 = equal_17 * borrow16
+or_sum_17 = term1_17 + term2_17
+or_prod_17 = term1_17 * term2_17
+or_prod2_17 = or_prod_17 + or_prod_17
+borrow17 = or_sum_17 - or_prod2_17
+
+# Bit 18 subtraction
+sum_18_ab = a[18] + b[18]
+prod_18_ab = a[18] * b[18]
+prod2_18_ab = prod_18_ab + prod_18_ab
+xor_18_ab = sum_18_ab - prod2_18_ab
+sum_18_final = xor_18_ab + borrow17
+prod_18_final = xor_18_ab * borrow17
+prod2_18_final = prod_18_final + prod_18_final
+diff18 = sum_18_final - prod2_18_final
+not_a18 = 1 - a[18]
+term1_18 = not_a18 * b[18]
+equal_18 = 1 - xor_18_ab
+term2_18 = equal_18 * borrow17
+or_sum_18 = term1_18 + term2_18
+or_prod_18 = term1_18 * term2_18
+or_prod2_18 = or_prod_18 + or_prod_18
+borrow18 = or_sum_18 - or_prod2_18
+
+# Bit 19 subtraction
+sum_19_ab = a[19] + b[19]
+prod_19_ab = a[19] * b[19]
+prod2_19_ab = prod_19_ab + prod_19_ab
+xor_19_ab = sum_19_ab - prod2_19_ab
+sum_19_final = xor_19_ab + borrow18
+prod_19_final = xor_19_ab * borrow18
+prod2_19_final = prod_19_final + prod_19_final
+diff19 = sum_19_final - prod2_19_final
+not_a19 = 1 - a[19]
+term1_19 = not_a19 * b[19]
+equal_19 = 1 - xor_19_ab
+term2_19 = equal_19 * borrow18
+or_sum_19 = term1_19 + term2_19
+or_prod_19 = term1_19 * term2_19
+or_prod2_19 = or_prod_19 + or_prod_19
+borrow19 = or_sum_19 - or_prod2_19
+
+# Bit 20 subtraction
+sum_20_ab = a[20] + b[20]
+prod_20_ab = a[20] * b[20]
+prod2_20_ab = prod_20_ab + prod_20_ab
+xor_20_ab = sum_20_ab - prod2_20_ab
+sum_20_final = xor_20_ab + borrow19
+prod_20_final = xor_20_ab * borrow19
+prod2_20_final = prod_20_final + prod_20_final
+diff20 = sum_20_final - prod2_20_final
+not_a20 = 1 - a[20]
+term1_20 = not_a20 * b[20]
+equal_20 = 1 - xor_20_ab
+term2_20 = equal_20 * borrow19
+or_sum_20 = term1_20 + term2_20
+or_prod_20 = term1_20 * term2_20
+or_prod2_20 = or_prod_20 + or_prod_20
+borrow20 = or_sum_20 - or_prod2_20
+
+# Bit 21 subtraction
+sum_21_ab = a[21] + b[21]
+prod_21_ab = a[21] * b[21]
+prod2_21_ab = prod_21_ab + prod_21_ab
+xor_21_ab = sum_21_ab - prod2_21_ab
+sum_21_final = xor_21_ab + borrow20
+prod_21_final = xor_21_ab * borrow20
+prod2_21_final = prod_21_final + prod_21_final
+diff21 = sum_21_final - prod2_21_final
+not_a21 = 1 - a[21]
+term1_21 = not_a21 * b[21]
+equal_21 = 1 - xor_21_ab
+term2_21 = equal_21 * borrow20
+or_sum_21 = term1_21 + term2_21
+or_prod_21 = term1_21 * term2_21
+or_prod2_21 = or_prod_21 + or_prod_21
+borrow21 = or_sum_21 - or_prod2_21
+
+# Bit 22 subtraction
+sum_22_ab = a[22] + b[22]
+prod_22_ab = a[22] * b[22]
+prod2_22_ab = prod_22_ab + prod_22_ab
+xor_22_ab = sum_22_ab - prod2_22_ab
+sum_22_final = xor_22_ab + borrow21
+prod_22_final = xor_22_ab * borrow21
+prod2_22_final = prod_22_final + prod_22_final
+diff22 = sum_22_final - prod2_22_final
+not_a22 = 1 - a[22]
+term1_22 = not_a22 * b[22]
+equal_22 = 1 - xor_22_ab
+term2_22 = equal_22 * borrow21
+or_sum_22 = term1_22 + term2_22
+or_prod_22 = term1_22 * term2_22
+or_prod2_22 = or_prod_22 + or_prod_22
+borrow22 = or_sum_22 - or_prod2_22
+
+# Bit 23 subtraction
+sum_23_ab = a[23] + b[23]
+prod_23_ab = a[23] * b[23]
+prod2_23_ab = prod_23_ab + prod_23_ab
+xor_23_ab = sum_23_ab - prod2_23_ab
+sum_23_final = xor_23_ab + borrow22
+prod_23_final = xor_23_ab * borrow22
+prod2_23_final = prod_23_final + prod_23_final
+diff23 = sum_23_final - prod2_23_final
+not_a23 = 1 - a[23]
+term1_23 = not_a23 * b[23]
+equal_23 = 1 - xor_23_ab
+term2_23 = equal_23 * borrow22
+or_sum_23 = term1_23 + term2_23
+or_prod_23 = term1_23 * term2_23
+or_prod2_23 = or_prod_23 + or_prod_23
+borrow23 = or_sum_23 - or_prod2_23
+
+# Bit 24 subtraction
+sum_24_ab = a[24] + b[24]
+prod_24_ab = a[24] * b[24]
+prod2_24_ab = prod_24_ab + prod_24_ab
+xor_24_ab = sum_24_ab - prod2_24_ab
+sum_24_final = xor_24_ab + borrow23
+prod_24_final = xor_24_ab * borrow23
+prod2_24_final = prod_24_final + prod_24_final
+diff24 = sum_24_final - prod2_24_final
+not_a24 = 1 - a[24]
+term1_24 = not_a24 * b[24]
+equal_24 = 1 - xor_24_ab
+term2_24 = equal_24 * borrow23
+or_sum_24 = term1_24 + term2_24
+or_prod_24 = term1_24 * term2_24
+or_prod2_24 = or_prod_24 + or_prod_24
+borrow24 = or_sum_24 - or_prod2_24
+
+# Bit 25 subtraction
+sum_25_ab = a[25] + b[25]
+prod_25_ab = a[25] * b[25]
+prod2_25_ab = prod_25_ab + prod_25_ab
+xor_25_ab = sum_25_ab - prod2_25_ab
+sum_25_final = xor_25_ab + borrow24
+prod_25_final = xor_25_ab * borrow24
+prod2_25_final = prod_25_final + prod_25_final
+diff25 = sum_25_final - prod2_25_final
+not_a25 = 1 - a[25]
+term1_25 = not_a25 * b[25]
+equal_25 = 1 - xor_25_ab
+term2_25 = equal_25 * borrow24
+or_sum_25 = term1_25 + term2_25
+or_prod_25 = term1_25 * term2_25
+or_prod2_25 = or_prod_25 + or_prod_25
+borrow25 = or_sum_25 - or_prod2_25
+
+# Bit 26 subtraction
+sum_26_ab = a[26] + b[26]
+prod_26_ab = a[26] * b[26]
+prod2_26_ab = prod_26_ab + prod_26_ab
+xor_26_ab = sum_26_ab - prod2_26_ab
+sum_26_final = xor_26_ab + borrow25
+prod_26_final = xor_26_ab * borrow25
+prod2_26_final = prod_26_final + prod_26_final
+diff26 = sum_26_final - prod2_26_final
+not_a26 = 1 - a[26]
+term1_26 = not_a26 * b[26]
+equal_26 = 1 - xor_26_ab
+term2_26 = equal_26 * borrow25
+or_sum_26 = term1_26 + term2_26
+or_prod_26 = term1_26 * term2_26
+or_prod2_26 = or_prod_26 + or_prod_26
+borrow26 = or_sum_26 - or_prod2_26
+
+# Bit 27 subtraction
+sum_27_ab = a[27] + b[27]
+prod_27_ab = a[27] * b[27]
+prod2_27_ab = prod_27_ab + prod_27_ab
+xor_27_ab = sum_27_ab - prod2_27_ab
+sum_27_final = xor_27_ab + borrow26
+prod_27_final = xor_27_ab * borrow26
+prod2_27_final = prod_27_final + prod_27_final
+diff27 = sum_27_final - prod2_27_final
+not_a27 = 1 - a[27]
+term1_27 = not_a27 * b[27]
+equal_27 = 1 - xor_27_ab
+term2_27 = equal_27 * borrow26
+or_sum_27 = term1_27 + term2_27
+or_prod_27 = term1_27 * term2_27
+or_prod2_27 = or_prod_27 + or_prod_27
+borrow27 = or_sum_27 - or_prod2_27
+
+# Bit 28 subtraction
+sum_28_ab = a[28] + b[28]
+prod_28_ab = a[28] * b[28]
+prod2_28_ab = prod_28_ab + prod_28_ab
+xor_28_ab = sum_28_ab - prod2_28_ab
+sum_28_final = xor_28_ab + borrow27
+prod_28_final = xor_28_ab * borrow27
+prod2_28_final = prod_28_final + prod_28_final
+diff28 = sum_28_final - prod2_28_final
+not_a28 = 1 - a[28]
+term1_28 = not_a28 * b[28]
+equal_28 = 1 - xor_28_ab
+term2_28 = equal_28 * borrow27
+or_sum_28 = term1_28 + term2_28
+or_prod_28 = term1_28 * term2_28
+or_prod2_28 = or_prod_28 + or_prod_28
+borrow28 = or_sum_28 - or_prod2_28
+
+# Bit 29 subtraction
+sum_29_ab = a[29] + b[29]
+prod_29_ab = a[29] * b[29]
+prod2_29_ab = prod_29_ab + prod_29_ab
+xor_29_ab = sum_29_ab - prod2_29_ab
+sum_29_final = xor_29_ab + borrow28
+prod_29_final = xor_29_ab * borrow28
+prod2_29_final = prod_29_final + prod_29_final
+diff29 = sum_29_final - prod2_29_final
+not_a29 = 1 - a[29]
+term1_29 = not_a29 * b[29]
+equal_29 = 1 - xor_29_ab
+term2_29 = equal_29 * borrow28
+or_sum_29 = term1_29 + term2_29
+or_prod_29 = term1_29 * term2_29
+or_prod2_29 = or_prod_29 + or_prod_29
+borrow29 = or_sum_29 - or_prod2_29
+
+# Bit 30 subtraction
+sum_30_ab = a[30] + b[30]
+prod_30_ab = a[30] * b[30]
+prod2_30_ab = prod_30_ab + prod_30_ab
+xor_30_ab = sum_30_ab - prod2_30_ab
+sum_30_final = xor_30_ab + borrow29
+prod_30_final = xor_30_ab * borrow29
+prod2_30_final = prod_30_final + prod_30_final
+diff30 = sum_30_final - prod2_30_final
+not_a30 = 1 - a[30]
+term1_30 = not_a30 * b[30]
+equal_30 = 1 - xor_30_ab
+term2_30 = equal_30 * borrow29
+or_sum_30 = term1_30 + term2_30
+or_prod_30 = term1_30 * term2_30
+or_prod2_30 = or_prod_30 + or_prod_30
+borrow30 = or_sum_30 - or_prod2_30
+
+# Bit 31 subtraction
+sum_31_ab = a[31] + b[31]
+prod_31_ab = a[31] * b[31]
+prod2_31_ab = prod_31_ab + prod_31_ab
+xor_31_ab = sum_31_ab - prod2_31_ab
+sum_31_final = xor_31_ab + borrow30
+prod_31_final = xor_31_ab * borrow30
+prod2_31_final = prod_31_final + prod_31_final
+diff31 = sum_31_final - prod2_31_final
+not_a31 = 1 - a[31]
+term1_31 = not_a31 * b[31]
+equal_31 = 1 - xor_31_ab
+term2_31 = equal_31 * borrow30
+or_sum_31 = term1_31 + term2_31
+or_prod_31 = term1_31 * term2_31
+or_prod2_31 = or_prod_31 + or_prod_31
+borrow31 = or_sum_31 - or_prod2_31
+
+no_borrow = 1 - borrow31
+no_borrow == result

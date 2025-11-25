@@ -1,0 +1,7 @@
+# Syntax error: equality operator without proper operands
+decl private x
+
+x_gate = x + 1
+
+# Missing left operand
+== 5

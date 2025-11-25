@@ -1,0 +1,6 @@
+# Semantic error: assigning to array element of declared variable
+decl private a[4]
+
+# Cannot assign to elements of declared arrays
+# a[0] is an input, not a gate output
+a[0] = 5

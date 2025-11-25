@@ -1,0 +1,9 @@
+# Semantic error: This is now a VALID file
+# Declared variables CAN be assigned (test kept for documentation)
+decl private x
+
+# This IS actually valid - declared variables can be assigned once
+y = x + 1
+
+# This is the error - multiple assignment
+y = x + 2

@@ -1,0 +1,5 @@
+# Syntax error: missing operator between operands
+decl private a, b
+
+# Missing operator
+result = a b

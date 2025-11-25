@@ -1,0 +1,5 @@
+# Syntax error: unclosed array bracket
+decl private a[4]
+
+# Missing closing bracket
+x = a[0
