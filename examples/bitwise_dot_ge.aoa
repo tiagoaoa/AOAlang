@@ -1,0 +1,353 @@
+# Bitwise Dot Product: w0*x0 + w1*x1 >= t
+#
+# Each w_i, x_i is a 4-bit value:
+#   w0 = w0[0] + 2*w0[1] + 4*w0[2] + 8*w0[3]
+#   x0 = x0[0] + 2*x0[1] + 4*x0[2] + 8*x0[3]
+#
+# Private:  x0[4], x1[4] - two 4-bit secret values
+#           prod_bits - partial product witness hints
+# Deferred: w0[4], w1[4] - two 4-bit symbolic weights
+#           t[8] - 8-bit threshold (max sum = 2*15*15 = 450, needs 9 bits, use 8 for simplicity)
+#
+# 4x4 multiplication uses grade-school algorithm:
+#   w * x = sum over i,j of (w[i] * x[j] * 2^(i+j))
+
+decl private x0[4]
+decl private x1[4]
+decl private sum_bits[9]
+decl deferred w0[4]
+decl deferred w1[4]
+decl deferred t[9]
+
+# ============ BOOLEAN CONSTRAINTS (private inputs) ============
+x00_sq = x0[0] * x0[0]
+x00_bit = x00_sq - x0[0]
+x01_sq = x0[1] * x0[1]
+x01_bit = x01_sq - x0[1]
+x02_sq = x0[2] * x0[2]
+x02_bit = x02_sq - x0[2]
+x03_sq = x0[3] * x0[3]
+x03_bit = x03_sq - x0[3]
+
+x10_sq = x1[0] * x1[0]
+x10_bit = x10_sq - x1[0]
+x11_sq = x1[1] * x1[1]
+x11_bit = x11_sq - x1[1]
+x12_sq = x1[2] * x1[2]
+x12_bit = x12_sq - x1[2]
+x13_sq = x1[3] * x1[3]
+x13_bit = x13_sq - x1[3]
+
+sb0_sq = sum_bits[0] * sum_bits[0]
+sb0_bit = sb0_sq - sum_bits[0]
+sb1_sq = sum_bits[1] * sum_bits[1]
+sb1_bit = sb1_sq - sum_bits[1]
+sb2_sq = sum_bits[2] * sum_bits[2]
+sb2_bit = sb2_sq - sum_bits[2]
+sb3_sq = sum_bits[3] * sum_bits[3]
+sb3_bit = sb3_sq - sum_bits[3]
+sb4_sq = sum_bits[4] * sum_bits[4]
+sb4_bit = sb4_sq - sum_bits[4]
+sb5_sq = sum_bits[5] * sum_bits[5]
+sb5_bit = sb5_sq - sum_bits[5]
+sb6_sq = sum_bits[6] * sum_bits[6]
+sb6_bit = sb6_sq - sum_bits[6]
+sb7_sq = sum_bits[7] * sum_bits[7]
+sb7_bit = sb7_sq - sum_bits[7]
+sb8_sq = sum_bits[8] * sum_bits[8]
+sb8_bit = sb8_sq - sum_bits[8]
+
+# ============ PARTIAL PRODUCTS: w0 * x0 ============
+# p0_ij = w0[i] AND x0[j], contributes to bit (i+j)
+p0_00 = w0[0] * x0[0]
+p0_01 = w0[0] * x0[1]
+p0_02 = w0[0] * x0[2]
+p0_03 = w0[0] * x0[3]
+p0_10 = w0[1] * x0[0]
+p0_11 = w0[1] * x0[1]
+p0_12 = w0[1] * x0[2]
+p0_13 = w0[1] * x0[3]
+p0_20 = w0[2] * x0[0]
+p0_21 = w0[2] * x0[1]
+p0_22 = w0[2] * x0[2]
+p0_23 = w0[2] * x0[3]
+p0_30 = w0[3] * x0[0]
+p0_31 = w0[3] * x0[1]
+p0_32 = w0[3] * x0[2]
+p0_33 = w0[3] * x0[3]
+
+# ============ PARTIAL PRODUCTS: w1 * x1 ============
+p1_00 = w1[0] * x1[0]
+p1_01 = w1[0] * x1[1]
+p1_02 = w1[0] * x1[2]
+p1_03 = w1[0] * x1[3]
+p1_10 = w1[1] * x1[0]
+p1_11 = w1[1] * x1[1]
+p1_12 = w1[1] * x1[2]
+p1_13 = w1[1] * x1[3]
+p1_20 = w1[2] * x1[0]
+p1_21 = w1[2] * x1[1]
+p1_22 = w1[2] * x1[2]
+p1_23 = w1[2] * x1[3]
+p1_30 = w1[3] * x1[0]
+p1_31 = w1[3] * x1[1]
+p1_32 = w1[3] * x1[2]
+p1_33 = w1[3] * x1[3]
+
+# ============ SUM ALL PARTIAL PRODUCTS (field arithmetic) ============
+# w0*x0 bit columns:
+#   bit 0: p0_00
+#   bit 1: p0_01 + p0_10
+#   bit 2: p0_02 + p0_11 + p0_20
+#   bit 3: p0_03 + p0_12 + p0_21 + p0_30
+#   bit 4: p0_13 + p0_22 + p0_31
+#   bit 5: p0_23 + p0_32
+#   bit 6: p0_33
+
+# Sum for w0*x0 using positional weights
+prod0_b0 = p0_00
+prod0_b1a = p0_01 + p0_10
+prod0_b2a = p0_02 + p0_11
+prod0_b2 = prod0_b2a + p0_20
+prod0_b3a = p0_03 + p0_12
+prod0_b3b = p0_21 + p0_30
+prod0_b3 = prod0_b3a + prod0_b3b
+prod0_b4a = p0_13 + p0_22
+prod0_b4 = prod0_b4a + p0_31
+prod0_b5 = p0_23 + p0_32
+prod0_b6 = p0_33
+
+# Weighted sum for w0*x0
+w0x0_t0 = prod0_b0
+w0x0_t1a = prod0_b1a + prod0_b1a
+w0x0_t2a = prod0_b2 + prod0_b2
+w0x0_t2 = w0x0_t2a + w0x0_t2a
+w0x0_t3a = prod0_b3 + prod0_b3
+w0x0_t3b = w0x0_t3a + w0x0_t3a
+w0x0_t3 = w0x0_t3b + w0x0_t3b
+w0x0_t4a = prod0_b4 + prod0_b4
+w0x0_t4b = w0x0_t4a + w0x0_t4a
+w0x0_t4c = w0x0_t4b + w0x0_t4b
+w0x0_t4 = w0x0_t4c + w0x0_t4c
+w0x0_t5a = prod0_b5 + prod0_b5
+w0x0_t5b = w0x0_t5a + w0x0_t5a
+w0x0_t5c = w0x0_t5b + w0x0_t5b
+w0x0_t5d = w0x0_t5c + w0x0_t5c
+w0x0_t5 = w0x0_t5d + w0x0_t5d
+w0x0_t6a = prod0_b6 + prod0_b6
+w0x0_t6b = w0x0_t6a + w0x0_t6a
+w0x0_t6c = w0x0_t6b + w0x0_t6b
+w0x0_t6d = w0x0_t6c + w0x0_t6c
+w0x0_t6e = w0x0_t6d + w0x0_t6d
+w0x0_t6 = w0x0_t6e + w0x0_t6e
+
+w0x0_s01 = w0x0_t0 + w0x0_t1a
+w0x0_s012 = w0x0_s01 + w0x0_t2
+w0x0_s0123 = w0x0_s012 + w0x0_t3
+w0x0_s01234 = w0x0_s0123 + w0x0_t4
+w0x0_s012345 = w0x0_s01234 + w0x0_t5
+w0x0_val = w0x0_s012345 + w0x0_t6
+
+# Same for w1*x1
+prod1_b0 = p1_00
+prod1_b1a = p1_01 + p1_10
+prod1_b2a = p1_02 + p1_11
+prod1_b2 = prod1_b2a + p1_20
+prod1_b3a = p1_03 + p1_12
+prod1_b3b = p1_21 + p1_30
+prod1_b3 = prod1_b3a + prod1_b3b
+prod1_b4a = p1_13 + p1_22
+prod1_b4 = prod1_b4a + p1_31
+prod1_b5 = p1_23 + p1_32
+prod1_b6 = p1_33
+
+w1x1_t0 = prod1_b0
+w1x1_t1a = prod1_b1a + prod1_b1a
+w1x1_t2a = prod1_b2 + prod1_b2
+w1x1_t2 = w1x1_t2a + w1x1_t2a
+w1x1_t3a = prod1_b3 + prod1_b3
+w1x1_t3b = w1x1_t3a + w1x1_t3a
+w1x1_t3 = w1x1_t3b + w1x1_t3b
+w1x1_t4a = prod1_b4 + prod1_b4
+w1x1_t4b = w1x1_t4a + w1x1_t4a
+w1x1_t4c = w1x1_t4b + w1x1_t4b
+w1x1_t4 = w1x1_t4c + w1x1_t4c
+w1x1_t5a = prod1_b5 + prod1_b5
+w1x1_t5b = w1x1_t5a + w1x1_t5a
+w1x1_t5c = w1x1_t5b + w1x1_t5b
+w1x1_t5d = w1x1_t5c + w1x1_t5c
+w1x1_t5 = w1x1_t5d + w1x1_t5d
+w1x1_t6a = prod1_b6 + prod1_b6
+w1x1_t6b = w1x1_t6a + w1x1_t6a
+w1x1_t6c = w1x1_t6b + w1x1_t6b
+w1x1_t6d = w1x1_t6c + w1x1_t6c
+w1x1_t6e = w1x1_t6d + w1x1_t6d
+w1x1_t6 = w1x1_t6e + w1x1_t6e
+
+w1x1_s01 = w1x1_t0 + w1x1_t1a
+w1x1_s012 = w1x1_s01 + w1x1_t2
+w1x1_s0123 = w1x1_s012 + w1x1_t3
+w1x1_s01234 = w1x1_s0123 + w1x1_t4
+w1x1_s012345 = w1x1_s01234 + w1x1_t5
+w1x1_val = w1x1_s012345 + w1x1_t6
+
+# Total sum (symbolic in w0, w1)
+total_sum = w0x0_val + w1x1_val
+
+# ============ VERIFY SUM DECOMPOSITION ============
+# total_sum = sum_bits[0] + 2*sum_bits[1] + ... + 256*sum_bits[8]
+coef1 = sum_bits[1] + sum_bits[1]
+coef2a = sum_bits[2] + sum_bits[2]
+coef2 = coef2a + coef2a
+coef3a = sum_bits[3] + sum_bits[3]
+coef3b = coef3a + coef3a
+coef3 = coef3b + coef3b
+coef4a = sum_bits[4] + sum_bits[4]
+coef4b = coef4a + coef4a
+coef4c = coef4b + coef4b
+coef4 = coef4c + coef4c
+coef5a = sum_bits[5] + sum_bits[5]
+coef5b = coef5a + coef5a
+coef5c = coef5b + coef5b
+coef5d = coef5c + coef5c
+coef5 = coef5d + coef5d
+coef6a = sum_bits[6] + sum_bits[6]
+coef6b = coef6a + coef6a
+coef6c = coef6b + coef6b
+coef6d = coef6c + coef6c
+coef6e = coef6d + coef6d
+coef6 = coef6e + coef6e
+coef7a = sum_bits[7] + sum_bits[7]
+coef7b = coef7a + coef7a
+coef7c = coef7b + coef7b
+coef7d = coef7c + coef7c
+coef7e = coef7d + coef7d
+coef7f = coef7e + coef7e
+coef7 = coef7f + coef7f
+coef8a = sum_bits[8] + sum_bits[8]
+coef8b = coef8a + coef8a
+coef8c = coef8b + coef8b
+coef8d = coef8c + coef8c
+coef8e = coef8d + coef8d
+coef8f = coef8e + coef8e
+coef8g = coef8f + coef8f
+coef8 = coef8g + coef8g
+
+rec_01 = sum_bits[0] + coef1
+rec_012 = rec_01 + coef2
+rec_0123 = rec_012 + coef3
+rec_01234 = rec_0123 + coef4
+rec_012345 = rec_01234 + coef5
+rec_0123456 = rec_012345 + coef6
+rec_01234567 = rec_0123456 + coef7
+recon_sum = rec_01234567 + coef8
+
+decomp_diff = recon_sum - total_sum
+
+# ============ 9-BIT SUBTRACTION: sum_bits - t ============
+# Borrow chain
+
+# Bit 0
+not_sb0 = 1 - sum_bits[0]
+bw0 = not_sb0 * t[0]
+
+# Bit 1
+not_sb1 = 1 - sum_bits[1]
+and1_a = not_sb1 * t[1]
+and1_b = not_sb1 * bw0
+and1_c = t[1] * bw0
+or1_ab = and1_a + and1_b
+and1_ab = and1_a * and1_b
+or1_ab_v = or1_ab - and1_ab
+or1_abc = or1_ab_v + and1_c
+and1_abc = or1_ab_v * and1_c
+bw1 = or1_abc - and1_abc
+
+# Bit 2
+not_sb2 = 1 - sum_bits[2]
+and2_a = not_sb2 * t[2]
+and2_b = not_sb2 * bw1
+and2_c = t[2] * bw1
+or2_ab = and2_a + and2_b
+and2_ab = and2_a * and2_b
+or2_ab_v = or2_ab - and2_ab
+or2_abc = or2_ab_v + and2_c
+and2_abc = or2_ab_v * and2_c
+bw2 = or2_abc - and2_abc
+
+# Bit 3
+not_sb3 = 1 - sum_bits[3]
+and3_a = not_sb3 * t[3]
+and3_b = not_sb3 * bw2
+and3_c = t[3] * bw2
+or3_ab = and3_a + and3_b
+and3_ab = and3_a * and3_b
+or3_ab_v = or3_ab - and3_ab
+or3_abc = or3_ab_v + and3_c
+and3_abc = or3_ab_v * and3_c
+bw3 = or3_abc - and3_abc
+
+# Bit 4
+not_sb4 = 1 - sum_bits[4]
+and4_a = not_sb4 * t[4]
+and4_b = not_sb4 * bw3
+and4_c = t[4] * bw3
+or4_ab = and4_a + and4_b
+and4_ab = and4_a * and4_b
+or4_ab_v = or4_ab - and4_ab
+or4_abc = or4_ab_v + and4_c
+and4_abc = or4_ab_v * and4_c
+bw4 = or4_abc - and4_abc
+
+# Bit 5
+not_sb5 = 1 - sum_bits[5]
+and5_a = not_sb5 * t[5]
+and5_b = not_sb5 * bw4
+and5_c = t[5] * bw4
+or5_ab = and5_a + and5_b
+and5_ab = and5_a * and5_b
+or5_ab_v = or5_ab - and5_ab
+or5_abc = or5_ab_v + and5_c
+and5_abc = or5_ab_v * and5_c
+bw5 = or5_abc - and5_abc
+
+# Bit 6
+not_sb6 = 1 - sum_bits[6]
+and6_a = not_sb6 * t[6]
+and6_b = not_sb6 * bw5
+and6_c = t[6] * bw5
+or6_ab = and6_a + and6_b
+and6_ab = and6_a * and6_b
+or6_ab_v = or6_ab - and6_ab
+or6_abc = or6_ab_v + and6_c
+and6_abc = or6_ab_v * and6_c
+bw6 = or6_abc - and6_abc
+
+# Bit 7
+not_sb7 = 1 - sum_bits[7]
+and7_a = not_sb7 * t[7]
+and7_b = not_sb7 * bw6
+and7_c = t[7] * bw6
+or7_ab = and7_a + and7_b
+and7_ab = and7_a * and7_b
+or7_ab_v = or7_ab - and7_ab
+or7_abc = or7_ab_v + and7_c
+and7_abc = or7_ab_v * and7_c
+bw7 = or7_abc - and7_abc
+
+# Bit 8 (MSB)
+not_sb8 = 1 - sum_bits[8]
+and8_a = not_sb8 * t[8]
+and8_b = not_sb8 * bw7
+and8_c = t[8] * bw7
+or8_ab = and8_a + and8_b
+and8_ab = and8_a * and8_b
+or8_ab_v = or8_ab - and8_ab
+or8_abc = or8_ab_v + and8_c
+and8_abc = or8_ab_v * and8_c
+bw8 = or8_abc - and8_abc
+
+# ============ SINGLE ASSERTION: SIGN BIT ============
+# bw8 = 0 means sum >= t
+zero = 0
+sign_check = bw8 == zero

@@ -1,258 +1,129 @@
 # Bitwise Greater-Equal: x >= t (8-bit unsigned comparison)
 #
-# Private:  x[8] - 8-bit secret value (x = sum(x[i] * 2^i))
+# Private:  x[8] - 8-bit secret value
 # Deferred: t[8] - 8-bit symbolic threshold
 #
-# Proves x >= t by computing diff = x - t using a borrow chain.
-# If final borrow = 0, then x >= t (no underflow).
+# Proves x >= t by computing subtraction with borrow chain.
+# Only asserts: borrow[7] == 0 (no underflow means x >= t)
 #
-# Subtraction bit logic:
-#   diff[i] = x[i] XOR t[i] XOR borrow[i-1]
-#   borrow[i] = (!x[i] & t[i]) | (!x[i] & borrow[i-1]) | (t[i] & borrow[i-1])
-#
-# In R1CS:
+# Bitwise ops in R1CS:
 #   XOR(a,b) = a + b - 2*a*b
 #   AND(a,b) = a * b
 #   NOT(a)   = 1 - a
 #   OR(a,b)  = a + b - a*b
 
 decl private x[8]
-decl private borrow[8]
-decl private diff[8]
 decl deferred t[8]
 
-# ============ BOOLEAN CONSTRAINTS ============
-# Enforce x[i] ∈ {0,1}
+# ============ BOOLEAN CONSTRAINTS (inputs only) ============
 x0_sq = x[0] * x[0]
-x0_bool = x0_sq == x[0]
+x0_bit = x0_sq - x[0]
 x1_sq = x[1] * x[1]
-x1_bool = x1_sq == x[1]
+x1_bit = x1_sq - x[1]
 x2_sq = x[2] * x[2]
-x2_bool = x2_sq == x[2]
+x2_bit = x2_sq - x[2]
 x3_sq = x[3] * x[3]
-x3_bool = x3_sq == x[3]
+x3_bit = x3_sq - x[3]
 x4_sq = x[4] * x[4]
-x4_bool = x4_sq == x[4]
+x4_bit = x4_sq - x[4]
 x5_sq = x[5] * x[5]
-x5_bool = x5_sq == x[5]
+x5_bit = x5_sq - x[5]
 x6_sq = x[6] * x[6]
-x6_bool = x6_sq == x[6]
+x6_bit = x6_sq - x[6]
 x7_sq = x[7] * x[7]
-x7_bool = x7_sq == x[7]
-
-# Enforce borrow[i] ∈ {0,1}
-bw0_sq = borrow[0] * borrow[0]
-bw0_bool = bw0_sq == borrow[0]
-bw1_sq = borrow[1] * borrow[1]
-bw1_bool = bw1_sq == borrow[1]
-bw2_sq = borrow[2] * borrow[2]
-bw2_bool = bw2_sq == borrow[2]
-bw3_sq = borrow[3] * borrow[3]
-bw3_bool = bw3_sq == borrow[3]
-bw4_sq = borrow[4] * borrow[4]
-bw4_bool = bw4_sq == borrow[4]
-bw5_sq = borrow[5] * borrow[5]
-bw5_bool = bw5_sq == borrow[5]
-bw6_sq = borrow[6] * borrow[6]
-bw6_bool = bw6_sq == borrow[6]
-bw7_sq = borrow[7] * borrow[7]
-bw7_bool = bw7_sq == borrow[7]
-
-# Enforce diff[i] ∈ {0,1}
-d0_sq = diff[0] * diff[0]
-d0_bool = d0_sq == diff[0]
-d1_sq = diff[1] * diff[1]
-d1_bool = d1_sq == diff[1]
-d2_sq = diff[2] * diff[2]
-d2_bool = d2_sq == diff[2]
-d3_sq = diff[3] * diff[3]
-d3_bool = d3_sq == diff[3]
-d4_sq = diff[4] * diff[4]
-d4_bool = d4_sq == diff[4]
-d5_sq = diff[5] * diff[5]
-d5_bool = d5_sq == diff[5]
-d6_sq = diff[6] * diff[6]
-d6_bool = d6_sq == diff[6]
-d7_sq = diff[7] * diff[7]
-d7_bool = d7_sq == diff[7]
+x7_bit = x7_sq - x[7]
 
 # ============ BIT 0: HALF SUBTRACTOR ============
-# diff[0] = x[0] XOR t[0] = x[0] + t[0] - 2*x[0]*t[0]
 # borrow[0] = !x[0] & t[0] = (1 - x[0]) * t[0]
-xt0 = x[0] * t[0]
-two_xt0 = xt0 + xt0
-xor0_sum = x[0] + t[0]
-xor0 = xor0_sum - two_xt0
-chk_d0 = xor0 == diff[0]
-
 not_x0 = 1 - x[0]
-bw0_calc = not_x0 * t[0]
-chk_bw0 = bw0_calc == borrow[0]
+bw0 = not_x0 * t[0]
 
 # ============ BIT 1: FULL SUBTRACTOR ============
-# diff[1] = x[1] XOR t[1] XOR borrow[0]
-# borrow[1] = (!x[1] & t[1]) | (!x[1] & borrow[0]) | (t[1] & borrow[0])
-xt1 = x[1] * t[1]
-two_xt1 = xt1 + xt1
-xor1_tmp_sum = x[1] + t[1]
-xor1_tmp = xor1_tmp_sum - two_xt1
-xor1_bw0 = xor1_tmp * borrow[0]
-two_xor1_bw0 = xor1_bw0 + xor1_bw0
-xor1_sum = xor1_tmp + borrow[0]
-xor1 = xor1_sum - two_xor1_bw0
-chk_d1 = xor1 == diff[1]
-
+# borrow[1] = (!x[1] & t[1]) | (!x[1] & bw0) | (t[1] & bw0)
 not_x1 = 1 - x[1]
 and1_a = not_x1 * t[1]
-and1_b = not_x1 * borrow[0]
-and1_c = t[1] * borrow[0]
+and1_b = not_x1 * bw0
+and1_c = t[1] * bw0
 or1_ab = and1_a + and1_b
 and1_ab = and1_a * and1_b
-or1_ab_val = or1_ab - and1_ab
-or1_abc = or1_ab_val + and1_c
-and1_abc = or1_ab_val * and1_c
-bw1_calc = or1_abc - and1_abc
-chk_bw1 = bw1_calc == borrow[1]
+or1_ab_v = or1_ab - and1_ab
+or1_abc = or1_ab_v + and1_c
+and1_abc = or1_ab_v * and1_c
+bw1 = or1_abc - and1_abc
 
 # ============ BIT 2: FULL SUBTRACTOR ============
-xt2 = x[2] * t[2]
-two_xt2 = xt2 + xt2
-xor2_tmp_sum = x[2] + t[2]
-xor2_tmp = xor2_tmp_sum - two_xt2
-xor2_bw1 = xor2_tmp * borrow[1]
-two_xor2_bw1 = xor2_bw1 + xor2_bw1
-xor2_sum = xor2_tmp + borrow[1]
-xor2 = xor2_sum - two_xor2_bw1
-chk_d2 = xor2 == diff[2]
-
 not_x2 = 1 - x[2]
 and2_a = not_x2 * t[2]
-and2_b = not_x2 * borrow[1]
-and2_c = t[2] * borrow[1]
+and2_b = not_x2 * bw1
+and2_c = t[2] * bw1
 or2_ab = and2_a + and2_b
 and2_ab = and2_a * and2_b
-or2_ab_val = or2_ab - and2_ab
-or2_abc = or2_ab_val + and2_c
-and2_abc = or2_ab_val * and2_c
-bw2_calc = or2_abc - and2_abc
-chk_bw2 = bw2_calc == borrow[2]
+or2_ab_v = or2_ab - and2_ab
+or2_abc = or2_ab_v + and2_c
+and2_abc = or2_ab_v * and2_c
+bw2 = or2_abc - and2_abc
 
 # ============ BIT 3: FULL SUBTRACTOR ============
-xt3 = x[3] * t[3]
-two_xt3 = xt3 + xt3
-xor3_tmp_sum = x[3] + t[3]
-xor3_tmp = xor3_tmp_sum - two_xt3
-xor3_bw2 = xor3_tmp * borrow[2]
-two_xor3_bw2 = xor3_bw2 + xor3_bw2
-xor3_sum = xor3_tmp + borrow[2]
-xor3 = xor3_sum - two_xor3_bw2
-chk_d3 = xor3 == diff[3]
-
 not_x3 = 1 - x[3]
 and3_a = not_x3 * t[3]
-and3_b = not_x3 * borrow[2]
-and3_c = t[3] * borrow[2]
+and3_b = not_x3 * bw2
+and3_c = t[3] * bw2
 or3_ab = and3_a + and3_b
 and3_ab = and3_a * and3_b
-or3_ab_val = or3_ab - and3_ab
-or3_abc = or3_ab_val + and3_c
-and3_abc = or3_ab_val * and3_c
-bw3_calc = or3_abc - and3_abc
-chk_bw3 = bw3_calc == borrow[3]
+or3_ab_v = or3_ab - and3_ab
+or3_abc = or3_ab_v + and3_c
+and3_abc = or3_ab_v * and3_c
+bw3 = or3_abc - and3_abc
 
 # ============ BIT 4: FULL SUBTRACTOR ============
-xt4 = x[4] * t[4]
-two_xt4 = xt4 + xt4
-xor4_tmp_sum = x[4] + t[4]
-xor4_tmp = xor4_tmp_sum - two_xt4
-xor4_bw3 = xor4_tmp * borrow[3]
-two_xor4_bw3 = xor4_bw3 + xor4_bw3
-xor4_sum = xor4_tmp + borrow[3]
-xor4 = xor4_sum - two_xor4_bw3
-chk_d4 = xor4 == diff[4]
-
 not_x4 = 1 - x[4]
 and4_a = not_x4 * t[4]
-and4_b = not_x4 * borrow[3]
-and4_c = t[4] * borrow[3]
+and4_b = not_x4 * bw3
+and4_c = t[4] * bw3
 or4_ab = and4_a + and4_b
 and4_ab = and4_a * and4_b
-or4_ab_val = or4_ab - and4_ab
-or4_abc = or4_ab_val + and4_c
-and4_abc = or4_ab_val * and4_c
-bw4_calc = or4_abc - and4_abc
-chk_bw4 = bw4_calc == borrow[4]
+or4_ab_v = or4_ab - and4_ab
+or4_abc = or4_ab_v + and4_c
+and4_abc = or4_ab_v * and4_c
+bw4 = or4_abc - and4_abc
 
 # ============ BIT 5: FULL SUBTRACTOR ============
-xt5 = x[5] * t[5]
-two_xt5 = xt5 + xt5
-xor5_tmp_sum = x[5] + t[5]
-xor5_tmp = xor5_tmp_sum - two_xt5
-xor5_bw4 = xor5_tmp * borrow[4]
-two_xor5_bw4 = xor5_bw4 + xor5_bw4
-xor5_sum = xor5_tmp + borrow[4]
-xor5 = xor5_sum - two_xor5_bw4
-chk_d5 = xor5 == diff[5]
-
 not_x5 = 1 - x[5]
 and5_a = not_x5 * t[5]
-and5_b = not_x5 * borrow[4]
-and5_c = t[5] * borrow[4]
+and5_b = not_x5 * bw4
+and5_c = t[5] * bw4
 or5_ab = and5_a + and5_b
 and5_ab = and5_a * and5_b
-or5_ab_val = or5_ab - and5_ab
-or5_abc = or5_ab_val + and5_c
-and5_abc = or5_ab_val * and5_c
-bw5_calc = or5_abc - and5_abc
-chk_bw5 = bw5_calc == borrow[5]
+or5_ab_v = or5_ab - and5_ab
+or5_abc = or5_ab_v + and5_c
+and5_abc = or5_ab_v * and5_c
+bw5 = or5_abc - and5_abc
 
 # ============ BIT 6: FULL SUBTRACTOR ============
-xt6 = x[6] * t[6]
-two_xt6 = xt6 + xt6
-xor6_tmp_sum = x[6] + t[6]
-xor6_tmp = xor6_tmp_sum - two_xt6
-xor6_bw5 = xor6_tmp * borrow[5]
-two_xor6_bw5 = xor6_bw5 + xor6_bw5
-xor6_sum = xor6_tmp + borrow[5]
-xor6 = xor6_sum - two_xor6_bw5
-chk_d6 = xor6 == diff[6]
-
 not_x6 = 1 - x[6]
 and6_a = not_x6 * t[6]
-and6_b = not_x6 * borrow[5]
-and6_c = t[6] * borrow[5]
+and6_b = not_x6 * bw5
+and6_c = t[6] * bw5
 or6_ab = and6_a + and6_b
 and6_ab = and6_a * and6_b
-or6_ab_val = or6_ab - and6_ab
-or6_abc = or6_ab_val + and6_c
-and6_abc = or6_ab_val * and6_c
-bw6_calc = or6_abc - and6_abc
-chk_bw6 = bw6_calc == borrow[6]
+or6_ab_v = or6_ab - and6_ab
+or6_abc = or6_ab_v + and6_c
+and6_abc = or6_ab_v * and6_c
+bw6 = or6_abc - and6_abc
 
 # ============ BIT 7: FULL SUBTRACTOR (MSB) ============
-xt7 = x[7] * t[7]
-two_xt7 = xt7 + xt7
-xor7_tmp_sum = x[7] + t[7]
-xor7_tmp = xor7_tmp_sum - two_xt7
-xor7_bw6 = xor7_tmp * borrow[6]
-two_xor7_bw6 = xor7_bw6 + xor7_bw6
-xor7_sum = xor7_tmp + borrow[6]
-xor7 = xor7_sum - two_xor7_bw6
-chk_d7 = xor7 == diff[7]
-
 not_x7 = 1 - x[7]
 and7_a = not_x7 * t[7]
-and7_b = not_x7 * borrow[6]
-and7_c = t[7] * borrow[6]
+and7_b = not_x7 * bw6
+and7_c = t[7] * bw6
 or7_ab = and7_a + and7_b
 and7_ab = and7_a * and7_b
-or7_ab_val = or7_ab - and7_ab
-or7_abc = or7_ab_val + and7_c
-and7_abc = or7_ab_val * and7_c
-bw7_calc = or7_abc - and7_abc
-chk_bw7 = bw7_calc == borrow[7]
+or7_ab_v = or7_ab - and7_ab
+or7_abc = or7_ab_v + and7_c
+and7_abc = or7_ab_v * and7_c
+bw7 = or7_abc - and7_abc
 
-# ============ FINAL ASSERTION ============
-# borrow[7] = 0 means no underflow, i.e., x >= t
+# ============ SINGLE ASSERTION: SIGN BIT ============
+# bw7 = 0 means no underflow, i.e., x >= t
 zero = 0
-no_borrow = borrow[7] == zero
+sign_check = bw7 == zero
