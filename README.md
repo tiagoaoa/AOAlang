@@ -438,9 +438,9 @@ This encodes: `x[0] * x[0] = x_squared`
 ### Symbolic Expressions
 
 The `symbolic_propagation` section tracks how each gate variable is computed symbolically. This enables:
-- **Gröbner basis elimination** for public discriminants
-- **Witness derivation** from symbolic inputs
-- **Circuit debugging** and verification
+- **Witness computation** - derive gate values from inputs
+- **Circuit debugging** - trace how values flow through the circuit
+- **Downstream processing** - proof systems can use symbolic info for optimization
 
 ## Grammar Summary
 
