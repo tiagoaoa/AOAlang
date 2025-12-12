@@ -442,6 +442,102 @@ The `symbolic_propagation` section tracks how each gate variable is computed sym
 - **Circuit debugging** - trace how values flow through the circuit
 - **Downstream processing** - proof systems can use symbolic info for optimization
 
+### Example: Vitalik's QAP with Symbolic Input
+
+Based on [Vitalik Buterin's QAP tutorial](https://medium.com/@VitalikButerin/quadratic-arithmetic-programs-from-zero-to-hero-f6d558cea649), we modify `x³ + x + 5 = 35` to use a symbolic (deferred) input `k` instead of the constant `5`.
+
+**Input (`vitalik_qap.aoa`):**
+```aoa
+decl private x
+decl deferred k
+
+# Flatten x³
+sym_1 = x * x
+y = sym_1 * x
+
+# Compute x³ + x + k
+sym_2 = y + x
+out = sym_2 + k
+
+# Enforce out == 35
+thirty_five = 35
+check = out == thirty_five
+```
+
+**Witness vector (9 variables):**
+```
+w = [~one, x, k, sym_1, y, sym_2, out, 35, check]
+     [0]  [1] [2]  [3]  [4]  [5]   [6] [7]   [8]
+
+With x=3, k=5:
+w = [1, 3, 5, 9, 27, 30, 35, 35, 0]
+```
+
+**Flattening (6 constraints):**
+```
+1. sym_1 = x * x           →  x² = 9
+2. y = sym_1 * x           →  x³ = 27
+3. sym_2 = y + x           →  x³ + x = 30
+4. out = sym_2 + k         →  x³ + x + k  [SYMBOLIC in k]
+5. thirty_five = 35        →  constant
+6. out == thirty_five      →  x³ + x + k = 35
+```
+
+**R1CS Matrices (Vitalik's style):**
+
+Matrix **A** (left input):
+```
+        ~one   x    k   sym_1   y   sym_2  out   35  check
+         [0]  [1]  [2]   [3]   [4]   [5]   [6]  [7]   [8]
+    ┌─────────────────────────────────────────────────────┐
+ 1. │   0     1    0     0      0     0     0    0     0  │  x
+ 2. │   0     0    0     1      0     0     0    0     0  │  sym_1
+ 3. │   0     1    0     0      1     0     0    0     0  │  y + x
+ 4. │   0     0    1     0      0     1     0    0     0  │  sym_2 + k
+ 5. │  -35    0    0     0      0     0     0    1     0  │  35 - 35·1
+ 6. │   0     0    0     0      0     0     1   -1     0  │  out - 35
+    └─────────────────────────────────────────────────────┘
+```
+
+Matrix **B** (right input):
+```
+        ~one   x    k   sym_1   y   sym_2  out   35  check
+         [0]  [1]  [2]   [3]   [4]   [5]   [6]  [7]   [8]
+    ┌─────────────────────────────────────────────────────┐
+ 1. │   0     1    0     0      0     0     0    0     0  │  x
+ 2. │   0     1    0     0      0     0     0    0     0  │  x
+ 3. │   1     0    0     0      0     0     0    0     0  │  1
+ 4. │   1     0    0     0      0     0     0    0     0  │  1
+ 5. │   1     0    0     0      0     0     0    0     0  │  1
+ 6. │   1     0    0     0      0     0     0    0     0  │  1
+    └─────────────────────────────────────────────────────┘
+```
+
+Matrix **C** (output):
+```
+        ~one   x    k   sym_1   y   sym_2  out   35  check
+         [0]  [1]  [2]   [3]   [4]   [5]   [6]  [7]   [8]
+    ┌─────────────────────────────────────────────────────┐
+ 1. │   0     0    0     1      0     0     0    0     0  │  sym_1
+ 2. │   0     0    0     0      1     0     0    0     0  │  y
+ 3. │   0     0    0     0      0     1     0    0     0  │  sym_2
+ 4. │   0     0    0     0      0     0     1    0     0  │  out
+ 5. │   0     0    0     0      0     0     0    0     0  │  0
+ 6. │   0     0    0     0      0     0     0    0     0  │  0
+    └─────────────────────────────────────────────────────┘
+```
+
+**Symbolic propagation chain:**
+```
+sym_1  = x * x           = x²
+y      = sym_1 * x       = x³
+sym_2  = y + x           = x³ + x
+out    = sym_2 + k       = x³ + x + k    ← SYMBOLIC in k
+check  = out - 35        = x³ + x + k - 35
+```
+
+The deferred input `k` flows through the R1CS as a **symbolic coefficient**. The final constraint enforces `x³ + x + k = 35`, so for `x = 3` the valid value is `k = 5`.
+
 ## Grammar Summary
 
 ### Declaration Syntax

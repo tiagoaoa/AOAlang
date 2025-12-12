@@ -1,0 +1,20 @@
+# Vitalik's QAP example with symbolic k
+# Original: x^3 + x + 5 = 35 (where x=3)
+# Modified: x^3 + x + k = 35 (k is symbolic/deferred)
+
+decl private x
+decl deferred k
+
+# Flatten x^3
+sym_1 = x * x
+y = sym_1 * x
+
+# Compute x^3 + x
+sym_2 = y + x
+
+# Compute x^3 + x + k
+out = sym_2 + k
+
+# Enforce out == 35
+thirty_five = 35
+check = out == thirty_five
