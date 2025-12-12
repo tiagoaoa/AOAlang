@@ -18,7 +18,7 @@ TARGET = $(BINDIR)/aoac
 # Source files
 YACC_SRC = $(SRCDIR)/aoa.y
 LEX_SRC = $(SRCDIR)/aoa.l
-C_SOURCES = $(SRCDIR)/main.c $(SRCDIR)/symbol_table.c $(SRCDIR)/error.c
+C_SOURCES = $(SRCDIR)/main.c $(SRCDIR)/symbol_table.c $(SRCDIR)/error.c $(SRCDIR)/r1cs.c
 
 # Generated files
 YACC_C = $(SRCDIR)/aoa.tab.c
@@ -27,7 +27,7 @@ LEX_C = $(SRCDIR)/lex.yy.c
 
 # Object files
 OBJECTS = $(SRCDIR)/aoa.tab.o $(SRCDIR)/lex.yy.o \
-          $(SRCDIR)/main.o $(SRCDIR)/symbol_table.o $(SRCDIR)/error.o
+          $(SRCDIR)/main.o $(SRCDIR)/symbol_table.o $(SRCDIR)/error.o $(SRCDIR)/r1cs.o
 
 # Default target
 all: $(TARGET)
@@ -60,11 +60,15 @@ $(SRCDIR)/%.o: $(SRCDIR)/%.c
 $(TARGET): $(BINDIR) $(OBJECTS)
 	$(CC) $(CFLAGS) -o $@ $(OBJECTS) $(LDFLAGS)
 	@echo ""
-	@echo "✓ Build successful!"
+	@echo "Build successful!"
 	@echo "Binary: $(TARGET)"
 	@echo ""
-	@echo "Usage: $(TARGET) <file.aoa>"
-	@echo "Example: $(TARGET) examples/simple_quad.aoa"
+	@echo "Usage:"
+	@echo "  $(TARGET) <file.aoa>              # Validate only"
+	@echo "  $(TARGET) -g <file.aoa>           # Generate R1CS JSON"
+	@echo "  $(TARGET) -g -o out.json <file.aoa>"
+	@echo ""
+	@echo "Example: $(TARGET) -g examples/simple_quad.aoa"
 	@echo ""
 
 # Run quick validation tests on valid example files only
@@ -95,17 +99,33 @@ test-errors: $(TARGET)
 		if [ -f "$$file" ]; then \
 			echo "Testing $$(basename $$file)..."; \
 			if $(TARGET) "$$file" > /dev/null 2>&1; then \
-				echo "  ✗ FAIL: Expected error but passed"; \
+				echo "  FAIL: Expected error but passed"; \
 				test_failed=$$((test_failed + 1)); \
 			else \
-				echo "  ✓ PASS: Error detected"; \
+				echo "  PASS: Error detected"; \
 			fi; \
 		fi; \
 	done; \
 	if [ $$test_failed -eq 0 ]; then \
-		echo "✓ All error tests passed!"; \
+		echo "All error tests passed!"; \
 	else \
-		echo "✗ $$test_failed test(s) failed"; \
+		echo "$$test_failed test(s) failed"; \
+		exit 1; \
+	fi
+
+# Test R1CS JSON generation
+test-generate: $(TARGET)
+	@echo "Testing R1CS JSON generation..."
+	@test_failed=0; \
+	for file in $(EXAMPLESDIR)/*.aoa; do \
+		echo "Generating R1CS for $$file..."; \
+		$(TARGET) -g "$$file" || test_failed=$$((test_failed + 1)); \
+		echo ""; \
+	done; \
+	if [ $$test_failed -eq 0 ]; then \
+		echo "All generation tests passed!"; \
+	else \
+		echo "$$test_failed test(s) failed"; \
 		exit 1; \
 	fi
 
@@ -134,23 +154,24 @@ distclean: clean
 
 # Show help
 help:
-	@echo "AOAlang Makefile"
+	@echo "AOAlang Compiler Makefile"
 	@echo ""
 	@echo "Build Targets:"
-	@echo "  all        - Build the parser (default)"
-	@echo "  clean      - Remove build artifacts"
-	@echo "  distclean  - Remove everything including binary"
+	@echo "  all           - Build the compiler (default)"
+	@echo "  clean         - Remove build artifacts"
+	@echo "  distclean     - Remove everything including binary"
 	@echo ""
 	@echo "Test Targets:"
-	@echo "  test       - Quick test: validate all valid examples"
-	@echo "  test-all   - Comprehensive test suite (valid + error tests)"
-	@echo "  test-errors- Test error detection only"
+	@echo "  test          - Quick test: validate all valid examples"
+	@echo "  test-all      - Comprehensive test suite (valid + error tests)"
+	@echo "  test-errors   - Test error detection only"
+	@echo "  test-generate - Test R1CS JSON generation for all examples"
 	@echo ""
 	@echo "Install Targets:"
-	@echo "  install    - Install to /usr/local/bin (requires sudo)"
-	@echo "  uninstall  - Remove from /usr/local/bin"
+	@echo "  install       - Install to /usr/local/bin (requires sudo)"
+	@echo "  uninstall     - Remove from /usr/local/bin"
 	@echo ""
 	@echo "Other Targets:"
-	@echo "  help       - Show this help message"
+	@echo "  help          - Show this help message"
 
-.PHONY: all test test-all test-errors install uninstall clean distclean help
+.PHONY: all test test-all test-errors test-generate install uninstall clean distclean help

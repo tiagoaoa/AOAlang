@@ -9,6 +9,7 @@
 #include <string.h>
 #include "symbol_table.h"
 #include "error.h"
+#include "r1cs.h"
 
 extern int yylex();
 extern int yylineno;
@@ -23,8 +24,85 @@ void handle_array_element_assignment(const char *array_name, const char *index_s
 void validate_variable_usage(const char *var_name);
 void validate_array_access(const char *array_name, const char *index_str);
 
+/* R1CS generation mode flag (set from main) */
+int generate_r1cs = 0;
+
 int error_count = 0;
 int in_constraint_section = 0;
+
+/* Expression tracking for R1CS generation */
+#define MAX_OPERANDS 8
+static char *expr_operands[MAX_OPERANDS];
+static int expr_n_operands = 0;
+static char expr_op = 0;
+static char *current_lhs = NULL;
+
+static void expr_reset(void) {
+    for (int i = 0; i < expr_n_operands; i++) {
+        if (expr_operands[i]) {
+            free(expr_operands[i]);
+            expr_operands[i] = NULL;
+        }
+    }
+    expr_n_operands = 0;
+    expr_op = 0;
+    if (current_lhs) {
+        free(current_lhs);
+        current_lhs = NULL;
+    }
+}
+
+static void expr_add_operand(const char *name) {
+    if (generate_r1cs && expr_n_operands < MAX_OPERANDS) {
+        expr_operands[expr_n_operands++] = strdup(name);
+    }
+}
+
+static void expr_set_op(char op) {
+    if (generate_r1cs) {
+        expr_op = op;
+    }
+}
+
+static void expr_set_lhs(const char *name) {
+    if (generate_r1cs) {
+        if (current_lhs) free(current_lhs);
+        current_lhs = strdup(name);
+    }
+}
+
+/* Generate R1CS constraint from current expression */
+static void generate_constraint(void) {
+    if (!generate_r1cs || !current_lhs || expr_n_operands < 1) return;
+
+    if (expr_op == '*' && expr_n_operands >= 2) {
+        r1cs_add_mul_constraint(current_lhs, expr_operands[0], expr_operands[1]);
+    } else if (expr_op == '+' && expr_n_operands >= 2) {
+        r1cs_add_add_constraint(current_lhs, expr_operands[0], expr_operands[1]);
+    } else if (expr_op == '-' && expr_n_operands >= 2) {
+        r1cs_add_sub_constraint(current_lhs, expr_operands[0], expr_operands[1]);
+    } else if (expr_op == 'E' && expr_n_operands >= 2) {
+        r1cs_add_eq_constraint(current_lhs, expr_operands[0], expr_operands[1]);
+    } else if (expr_n_operands == 1) {
+        char *endptr;
+        long val = strtol(expr_operands[0], &endptr, 10);
+        if (*endptr == '\0') {
+            r1cs_add_const_constraint(current_lhs, (int)val);
+        } else {
+            /* Identity */
+            r1cs_begin_constraint(current_lhs, current_lhs);
+            int op_idx = r1cs_get_witness_index(expr_operands[0]);
+            int res_idx = r1cs_get_witness_index(current_lhs);
+            if (op_idx >= 0 && res_idx >= 0) {
+                r1cs_add_A(op_idx, 1);
+                r1cs_add_B(0, 1);
+                r1cs_add_C(res_idx, 1);
+            }
+            r1cs_end_constraint();
+            r1cs_set_gate_expr(current_lhs, expr_operands[0]);
+        }
+    }
+}
 
 %}
 
@@ -82,9 +160,9 @@ declaration:
     ;
 
 visibility:
-      PRIVATE     { $$ = strdup("private"); }
-    | PUBLIC      { $$ = strdup("public"); }
-    | DEFERRED    { $$ = strdup("deferred"); }
+      PRIVATE     { $$ = strdup("private"); symbol_set_current_visibility(VISIBILITY_PRIVATE); }
+    | PUBLIC      { $$ = strdup("public"); symbol_set_current_visibility(VISIBILITY_PUBLIC); }
+    | DEFERRED    { $$ = strdup("deferred"); symbol_set_current_visibility(VISIBILITY_DEFERRED); }
     ;
 
 var_list:
@@ -101,6 +179,14 @@ var_decl:
                 error_count++;
             } else {
                 symbol_add($1, SYMBOL_SCALAR, 0);
+                if (generate_r1cs) {
+                    symbol_t *sym = symbol_lookup($1);
+                    if (sym) {
+                        r1cs_register_witness($1, sym->witness_index,
+                                              sym->visibility, sym->origin,
+                                              sym->type, 0);
+                    }
+                }
             }
             free($1);
         }
@@ -112,6 +198,14 @@ var_decl:
                 error_count++;
             } else {
                 symbol_add($1, SYMBOL_ARRAY, $3);
+                if (generate_r1cs) {
+                    symbol_t *sym = symbol_lookup($1);
+                    if (sym) {
+                        r1cs_register_witness($1, sym->witness_index,
+                                              sym->visibility, sym->origin,
+                                              sym->type, $3);
+                    }
+                }
             }
             free($1);
         }
@@ -147,23 +241,48 @@ constraint:
         {
             /* Equality constraint: var = expr1 == expr2 */
             handle_constraint_assignment($1);
+            expr_set_lhs($1);
+            expr_set_op('E');
+            generate_constraint();
+            expr_reset();
             free($1);
         }
     | IDENTIFIER ASSIGN expression
         {
             /* Regular assignment: var = expr */
             handle_constraint_assignment($1);
+            expr_set_lhs($1);
+            generate_constraint();
+            expr_reset();
             free($1);
         }
     | expression EQ_OP expression
         {
             /* Standalone equality constraint (e.g., no_borrow == result) */
             in_constraint_section = 1;
+            if (generate_r1cs && expr_n_operands >= 2) {
+                static int eq_counter = 0;
+                char implicit_name[64];
+                snprintf(implicit_name, sizeof(implicit_name), "_eq_%d", eq_counter++);
+                symbol_add_with_origin(implicit_name, SYMBOL_SCALAR, 0, SYMBOL_GATE);
+                symbol_mark_assigned(implicit_name);
+                symbol_t *sym = symbol_lookup(implicit_name);
+                if (sym) {
+                    r1cs_register_witness(implicit_name, sym->witness_index,
+                                          VISIBILITY_PRIVATE, SYMBOL_GATE,
+                                          SYMBOL_SCALAR, 0);
+                }
+                expr_set_lhs(implicit_name);
+                expr_set_op('E');
+                generate_constraint();
+            }
+            expr_reset();
         }
     | IDENTIFIER LBRACKET NUMBER RBRACKET ASSIGN expression
         {
             /* Assignment to array element - NOT ALLOWED in AOA */
             handle_array_element_assignment($1, $3);
+            expr_reset();
             free($1);
             free($3);
         }
@@ -179,9 +298,9 @@ constraint:
 
 expression:
       term
-    | expression PLUS term           { /* Addition gate */ }
-    | expression MINUS term          { /* Subtraction gate */ }
-    | term MULT term                 { /* Multiplication gate */ }
+    | expression PLUS term           { expr_set_op('+'); }
+    | expression MINUS term          { expr_set_op('-'); }
+    | term MULT term                 { expr_set_op('*'); }
     | error                          { /* Error recovery for malformed expressions */ }
     ;
 
@@ -195,18 +314,23 @@ term:
         {
             /* Scalar variable reference */
             validate_variable_usage($1);
+            expr_add_operand($1);
             free($1);
         }
     | IDENTIFIER LBRACKET NUMBER RBRACKET
         {
             /* Array element access */
             validate_array_access($1, $3);
+            char buf[256];
+            snprintf(buf, sizeof(buf), "%s[%s]", $1, $3);
+            expr_add_operand(buf);
             free($1);
             free($3);
         }
     | NUMBER
         {
             /* Numeric constant */
+            expr_add_operand($1);
             free($1);
         }
     ;
@@ -245,6 +369,16 @@ void handle_constraint_assignment(const char *var_name) {
         /* New gate variable - create and mark as assigned */
         symbol_add_with_origin(var_name, SYMBOL_SCALAR, 0, SYMBOL_GATE);
         symbol_mark_assigned(var_name);
+
+        /* Register in R1CS if generating */
+        if (generate_r1cs) {
+            sym = symbol_lookup(var_name);
+            if (sym) {
+                r1cs_register_witness(var_name, sym->witness_index,
+                                      VISIBILITY_PRIVATE, SYMBOL_GATE,
+                                      SYMBOL_SCALAR, 0);
+            }
+        }
     }
 }
 
