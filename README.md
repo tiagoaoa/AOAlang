@@ -464,22 +464,29 @@ thirty_five = 35
 check = out == thirty_five
 ```
 
-**Witness vector (9 variables):**
+**Witness vector (9 variables) - SYMBOLIC:**
 ```
-w = [~one, x, k, sym_1, y, sym_2, out, 35, check]
-     [0]  [1] [2]  [3]  [4]  [5]   [6] [7]   [8]
+w = [~one,  x,  k,  sym_1,  y,   sym_2,    out,     35, check]
+     [0]   [1] [2]   [3]   [4]    [5]      [6]     [7]   [8]
+w = [ 1,    x,  k,   x²,    x³,  x³+x,  x³+x+k,    35,    0 ]
+```
 
-With x=3, k=5:
-w = [1, 3, 5, 9, 27, 30, 35, 35, 0]
+With concrete private input x=3 (but k remains symbolic):
 ```
+w = [ 1,    3,  k,    9,   27,    30,    30+k,    35,    0 ]
+                ↑                         ↑
+            symbolic                  symbolic
+```
+
+The verifier substitutes k at verification time. For k=5: `30+k = 35` ✓
 
 **Flattening (6 constraints):**
 ```
-1. sym_1 = x * x           →  x² = 9
-2. y = sym_1 * x           →  x³ = 27
-3. sym_2 = y + x           →  x³ + x = 30
-4. out = sym_2 + k         →  x³ + x + k  [SYMBOLIC in k]
-5. thirty_five = 35        →  constant
+1. sym_1 = x * x           →  x²
+2. y = sym_1 * x           →  x³
+3. sym_2 = y + x           →  x³ + x
+4. out = sym_2 + k         →  x³ + x + k     ← SYMBOLIC (contains k)
+5. thirty_five = 35        →  35
 6. out == thirty_five      →  x³ + x + k = 35
 ```
 
@@ -532,11 +539,16 @@ Matrix **C** (output):
 sym_1  = x * x           = x²
 y      = sym_1 * x       = x³
 sym_2  = y + x           = x³ + x
-out    = sym_2 + k       = x³ + x + k    ← SYMBOLIC in k
+out    = sym_2 + k       = x³ + x + k    ← contains deferred symbol k
 check  = out - 35        = x³ + x + k - 35
 ```
 
-The deferred input `k` flows through the R1CS as a **symbolic coefficient**. The final constraint enforces `x³ + x + k = 35`, so for `x = 3` the valid value is `k = 5`.
+**How verification works:**
+1. Prover commits to the witness with `k` as a symbolic placeholder
+2. Verifier provides concrete value for `k` (e.g., k=5)
+3. Verifier substitutes k into `out = 30 + k = 35` and checks constraint 6
+
+The deferred input `k` propagates symbolically through the witness. The verifier "completes" the proof by binding `k` to a concrete value at verification time.
 
 ## Grammar Summary
 
