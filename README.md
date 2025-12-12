@@ -612,6 +612,72 @@ Given: w[0]=3, w[1]=2, t=10, and prover's x[0]=4, x[1]=5
   12 = 0 + 0 + 4 + 8 = b[0]=0, b[1]=0, b[2]=1, b[3]=1  ✓
 ```
 
+### Example: Bitwise Comparison (8-bit Subtractor)
+
+Proves `x >= t` where both are 8-bit unsigned integers using a **borrow-chain subtractor**.
+
+**Input (`bitwise_ge.aoa`):**
+```aoa
+decl private x[8]        # 8-bit secret value
+decl private borrow[8]   # borrow chain bits
+decl private diff[8]     # difference bits
+decl deferred t[8]       # 8-bit symbolic threshold
+
+# Boolean constraints: all bits ∈ {0,1}
+x0_sq = x[0] * x[0]
+x0_bool = x0_sq == x[0]
+# ... (for all x[i], borrow[i], diff[i])
+
+# Subtraction using borrow chain:
+#   diff[i] = x[i] XOR t[i] XOR borrow[i-1]
+#   borrow[i] = (!x[i] & t[i]) | (!x[i] & borrow[i-1]) | (t[i] & borrow[i-1])
+
+# Bit 0 (half subtractor - no incoming borrow):
+xt0 = x[0] * t[0]                    # AND
+two_xt0 = xt0 + xt0
+xor0_sum = x[0] + t[0]
+xor0 = xor0_sum - two_xt0            # XOR = a + b - 2ab
+chk_d0 = xor0 == diff[0]
+
+not_x0 = 1 - x[0]                    # NOT
+bw0_calc = not_x0 * t[0]             # borrow = !x & t
+chk_bw0 = bw0_calc == borrow[0]
+
+# Bits 1-7: full subtractors with borrow propagation
+# ... (same pattern with 3-input XOR and 3-input OR for borrow)
+
+# FINAL ASSERTION: borrow[7] = 0 means x >= t
+zero = 0
+no_borrow = borrow[7] == zero
+```
+
+**Circuit statistics:** 231 witnesses, 198 constraints, 9 public inputs
+
+**Bitwise operations in R1CS:**
+```
+XOR(a,b) = a + b - 2·a·b
+AND(a,b) = a · b
+NOT(a)   = 1 - a
+OR(a,b)  = a + b - a·b
+```
+
+**Borrow chain logic:**
+```
+Bit i:  diff[i]   = x[i] ⊕ t[i] ⊕ borrow[i-1]
+        borrow[i] = (!x[i] ∧ t[i]) ∨ (!x[i] ∧ borrow[i-1]) ∨ (t[i] ∧ borrow[i-1])
+```
+
+**Sign bit interpretation:**
+- `borrow[7] = 0` → no underflow → `x - t >= 0` → `x >= t` ✓
+- `borrow[7] = 1` → underflow → `x < t` (proof fails)
+
+**Symbolic propagation:**
+```
+t[0..7] flow through the borrow chain symbolically.
+Verifier substitutes concrete threshold bits at verification time.
+Example: t = 100 = 0b01100100 → t[2]=1, t[5]=1, t[6]=1, others=0
+```
+
 ## Grammar Summary
 
 ### Declaration Syntax
