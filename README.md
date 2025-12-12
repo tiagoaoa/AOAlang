@@ -550,6 +550,68 @@ check  = out - 35        = x³ + x + k - 35
 
 The deferred input `k` propagates symbolically through the witness. The verifier "completes" the proof by binding `k` to a concrete value at verification time.
 
+### Example: Range Proof with Symbolic Weights
+
+Proves `sum(w_i · x_i) >= t` where:
+- `x[i]` are **private** (secret values)
+- `w[i]` are **deferred** (symbolic weights - verifier provides)
+- `t` is **deferred** (symbolic threshold)
+
+**Input (`weighted_sum_ge.aoa`):**
+```aoa
+decl private x[2]
+decl private b[4]
+decl deferred w[2], t
+
+# Weighted sum
+prod0 = w[0] * x[0]
+prod1 = w[1] * x[1]
+weighted_sum = prod0 + prod1
+
+# diff = sum - t (must be >= 0)
+diff = weighted_sum - t
+
+# Bit decomposition proves diff >= 0 (4-bit range: 0-15)
+# Boolean constraint: b[i] ∈ {0,1} via b[i]² = b[i]
+b0_sq = b[0] * b[0]
+check_b0 = b0_sq == b[0]
+# ... (same for b[1], b[2], b[3])
+
+# Reconstruct: diff = b[0] + 2·b[1] + 4·b[2] + 8·b[3]
+two_b1 = b[1] + b[1]
+two_b2 = b[2] + b[2]
+four_b2 = two_b2 + two_b2
+# ... etc
+reconstructed = sum_012 + eight_b3
+
+# Verify decomposition
+final_check = reconstructed == diff
+```
+
+**Symbolic witness propagation:**
+```
+prod0        = w[0] · x[0]              ← contains w[0]
+prod1        = w[1] · x[1]              ← contains w[1]
+weighted_sum = w[0]·x[0] + w[1]·x[1]    ← contains w[0], w[1]
+diff         = w[0]·x[0] + w[1]·x[1] - t ← contains w[0], w[1], t
+```
+
+**How the range proof works:**
+
+1. `diff = sum - t` is computed symbolically
+2. Prover decomposes `diff` into bits `b[0..3]` (private)
+3. Boolean constraints ensure each `b[i] ∈ {0,1}`: `b[i]² = b[i]`
+4. Reconstruction constraint ensures: `diff = b[0] + 2·b[1] + 4·b[2] + 8·b[3]`
+5. If `diff` can be expressed as sum of non-negative bit values → `diff >= 0` → `sum >= t`
+
+**Verifier substitutes symbolic inputs:**
+```
+Given: w[0]=3, w[1]=2, t=10, and prover's x[0]=4, x[1]=5
+  weighted_sum = 3·4 + 2·5 = 22
+  diff = 22 - 10 = 12
+  12 = 0 + 0 + 4 + 8 = b[0]=0, b[1]=0, b[2]=1, b[3]=1  ✓
+```
+
 ## Grammar Summary
 
 ### Declaration Syntax

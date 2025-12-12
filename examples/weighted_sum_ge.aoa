@@ -1,0 +1,65 @@
+# Range Proof: sum(w_i * x_i) >= t
+#
+# Private inputs:  x[0], x[1] (secret values), b[0..3] (bit decomposition)
+# Deferred inputs: w[0], w[1] (symbolic weights), t (threshold)
+#
+# Proves the weighted sum is at least t by showing:
+#   diff = (w[0]*x[0] + w[1]*x[1]) - t >= 0
+#
+# Non-negativity is proven via bit decomposition:
+#   diff = b[0] + 2*b[1] + 4*b[2] + 8*b[3]  (4-bit, range 0-15)
+#   Each b[i] constrained to {0,1} via b[i]² = b[i]
+
+decl private x[2]
+decl private b[4]
+decl deferred w[2], t
+
+# ============ WEIGHTED SUM ============
+# Compute sum = w[0]*x[0] + w[1]*x[1]
+prod0 = w[0] * x[0]
+prod1 = w[1] * x[1]
+weighted_sum = prod0 + prod1
+
+# ============ DIFFERENCE ============
+# diff = sum - t (must be >= 0 for sum >= t)
+diff = weighted_sum - t
+
+# ============ BIT DECOMPOSITION ============
+# Boolean constraints: b[i] ∈ {0,1}
+# Enforced via b[i] * b[i] = b[i]
+b0_sq = b[0] * b[0]
+check_b0 = b0_sq == b[0]
+
+b1_sq = b[1] * b[1]
+check_b1 = b1_sq == b[1]
+
+b2_sq = b[2] * b[2]
+check_b2 = b2_sq == b[2]
+
+b3_sq = b[3] * b[3]
+check_b3 = b3_sq == b[3]
+
+# ============ RECONSTRUCTION ============
+# diff = b[0] + 2*b[1] + 4*b[2] + 8*b[3]
+# Using doubling: 2x = x + x, 4x = 2x + 2x, etc.
+
+# 2 * b[1]
+two_b1 = b[1] + b[1]
+
+# 4 * b[2] = 2*b[2] + 2*b[2]
+two_b2 = b[2] + b[2]
+four_b2 = two_b2 + two_b2
+
+# 8 * b[3] = 4*b[3] + 4*b[3]
+two_b3 = b[3] + b[3]
+four_b3 = two_b3 + two_b3
+eight_b3 = four_b3 + four_b3
+
+# Sum weighted bits
+sum_01 = b[0] + two_b1
+sum_012 = sum_01 + four_b2
+reconstructed = sum_012 + eight_b3
+
+# ============ FINAL CHECK ============
+# Verify bit decomposition equals diff
+final_check = reconstructed == diff
