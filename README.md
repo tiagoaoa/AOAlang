@@ -11,13 +11,13 @@ AOAlang provides a robust parser for `.aoa` files that validates both syntax and
 
 ## Features
 
-- ✅ Full AOA grammar support (comma-separated declarations, array identification by `[size]`)
-- ✅ Semantic analysis (variable declarations, scope checking)
-- ✅ Type checking (scalar vs array variables)
-- ✅ Index validation (arrays must be indexed, scalars cannot be indexed)
-- ✅ R1CS JSON generation with symbolic witness support (`-g` flag)
-- ✅ Built with Lex & Yacc for robust parsing
-- ✅ Standard POSIX-compatible build system
+- Full AOA grammar support (comma-separated declarations, array identification by `[size]`)
+- Semantic analysis (variable declarations, scope checking)
+- Type checking (scalar vs array variables)
+- Index validation (arrays must be indexed, scalars cannot be indexed)
+- R1CS JSON generation with symbolic witness support (`-g` flag)
+- Built with Lex & Yacc for robust parsing
+- Standard POSIX-compatible build system
 
 ## Quick Start
 
@@ -697,11 +697,11 @@ decl <visibility> <name1>, <name2>, ...
 - **One operation per line**
 
 ### Rules
-- ✅ Declarations must come before constraints
-- ✅ Variables must be declared before use
-- ✅ Arrays require index: `a[0]`
-- ✅ Scalars without index: `x`
-- ✅ One binary operation per assignment
+- Declarations must come before constraints
+- Variables must be declared before use
+- Arrays require index: `a[0]`
+- Scalars without index: `x`
+- One binary operation per assignment
 
 ## License
 
