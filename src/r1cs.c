@@ -913,34 +913,179 @@ void r1cs_generate_qap(FILE *out) {
     }
     fprintf(out, "\n");
 
+    /* Compute and store all polynomials for w.A(x), w.B(x), w.C(x) */
+    double **A_polys = malloc(n_vars * sizeof(double *));
+    double **B_polys = malloc(n_vars * sizeof(double *));
+    double **C_polys = malloc(n_vars * sizeof(double *));
+
+    for (int j = 0; j < n_vars; j++) {
+        A_polys[j] = malloc(n_cons * sizeof(double));
+        B_polys[j] = malloc(n_cons * sizeof(double));
+        C_polys[j] = malloc(n_cons * sizeof(double));
+
+        for (int i = 0; i < n_cons; i++) {
+            col_vals[i] = A_dense[i][j];
+        }
+        lagrange_interpolate(n_cons, col_vals, A_polys[j]);
+
+        for (int i = 0; i < n_cons; i++) {
+            col_vals[i] = B_dense[i][j];
+        }
+        lagrange_interpolate(n_cons, col_vals, B_polys[j]);
+
+        for (int i = 0; i < n_cons; i++) {
+            col_vals[i] = C_dense[i][j];
+        }
+        lagrange_interpolate(n_cons, col_vals, C_polys[j]);
+    }
+
     /* Print the combined P(x) expression */
     fprintf(out, "\n# P(x) = (w.A(x)) * (w.B(x)) - (w.C(x))\n\n");
 
-    /* Print w.A(x) */
+    /* Helper to print a polynomial term with witness variable */
+    char buf[64];
+
+    /* Print w.A(x) expanded */
     fprintf(out, "w.A(x) = ");
+    int first_term = 1;
     for (int j = 0; j < n_vars; j++) {
-        if (j > 0) fprintf(out, " + ");
-        fprintf(out, "%s*A_%s(x)", r1cs.witnesses[j].name, r1cs.witnesses[j].name);
-    }
-    fprintf(out, "\n");
+        /* Check if polynomial is non-zero */
+        int is_zero = 1;
+        for (int k = 0; k < n_cons; k++) {
+            if (fabs(A_polys[j][k]) > 1e-9) { is_zero = 0; break; }
+        }
+        if (is_zero) continue;
 
-    /* Print w.B(x) */
+        if (!first_term) fprintf(out, " + ");
+        first_term = 0;
+        fprintf(out, "%s*(", r1cs.witnesses[j].name);
+
+        int first_coef = 1;
+        for (int k = n_cons - 1; k >= 0; k--) {
+            double val = A_polys[j][k];
+            double rounded = (val >= 0) ? (int)(val + 0.5) : (int)(val - 0.5);
+            if (fabs(val - rounded) < 1e-9) val = rounded;
+            if (fabs(val) < 1e-9) continue;
+
+            if (first_coef) {
+                format_coeff(buf, sizeof(buf), val);
+                fprintf(out, "%s", buf);
+                first_coef = 0;
+            } else {
+                if (val >= 0) {
+                    format_coeff(buf, sizeof(buf), val);
+                    fprintf(out, " + %s", buf);
+                } else {
+                    format_coeff(buf, sizeof(buf), -val);
+                    fprintf(out, " - %s", buf);
+                }
+            }
+            if (k > 1) fprintf(out, "*x^%d", k);
+            else if (k == 1) fprintf(out, "*x");
+        }
+        if (first_coef) fprintf(out, "0");
+        fprintf(out, ")");
+    }
+    if (first_term) fprintf(out, "0");
+    fprintf(out, "\n\n");
+
+    /* Print w.B(x) expanded */
     fprintf(out, "w.B(x) = ");
+    first_term = 1;
     for (int j = 0; j < n_vars; j++) {
-        if (j > 0) fprintf(out, " + ");
-        fprintf(out, "%s*B_%s(x)", r1cs.witnesses[j].name, r1cs.witnesses[j].name);
-    }
-    fprintf(out, "\n");
+        int is_zero = 1;
+        for (int k = 0; k < n_cons; k++) {
+            if (fabs(B_polys[j][k]) > 1e-9) { is_zero = 0; break; }
+        }
+        if (is_zero) continue;
 
-    /* Print w.C(x) */
+        if (!first_term) fprintf(out, " + ");
+        first_term = 0;
+        fprintf(out, "%s*(", r1cs.witnesses[j].name);
+
+        int first_coef = 1;
+        for (int k = n_cons - 1; k >= 0; k--) {
+            double val = B_polys[j][k];
+            double rounded = (val >= 0) ? (int)(val + 0.5) : (int)(val - 0.5);
+            if (fabs(val - rounded) < 1e-9) val = rounded;
+            if (fabs(val) < 1e-9) continue;
+
+            if (first_coef) {
+                format_coeff(buf, sizeof(buf), val);
+                fprintf(out, "%s", buf);
+                first_coef = 0;
+            } else {
+                if (val >= 0) {
+                    format_coeff(buf, sizeof(buf), val);
+                    fprintf(out, " + %s", buf);
+                } else {
+                    format_coeff(buf, sizeof(buf), -val);
+                    fprintf(out, " - %s", buf);
+                }
+            }
+            if (k > 1) fprintf(out, "*x^%d", k);
+            else if (k == 1) fprintf(out, "*x");
+        }
+        if (first_coef) fprintf(out, "0");
+        fprintf(out, ")");
+    }
+    if (first_term) fprintf(out, "0");
+    fprintf(out, "\n\n");
+
+    /* Print w.C(x) expanded */
     fprintf(out, "w.C(x) = ");
+    first_term = 1;
     for (int j = 0; j < n_vars; j++) {
-        if (j > 0) fprintf(out, " + ");
-        fprintf(out, "%s*C_%s(x)", r1cs.witnesses[j].name, r1cs.witnesses[j].name);
-    }
-    fprintf(out, "\n");
+        int is_zero = 1;
+        for (int k = 0; k < n_cons; k++) {
+            if (fabs(C_polys[j][k]) > 1e-9) { is_zero = 0; break; }
+        }
+        if (is_zero) continue;
 
-    fprintf(out, "\nP(x) = (w.A(x)) * (w.B(x)) - (w.C(x)) = H(x) * T(x)\n");
+        if (!first_term) fprintf(out, " + ");
+        first_term = 0;
+        fprintf(out, "%s*(", r1cs.witnesses[j].name);
+
+        int first_coef = 1;
+        for (int k = n_cons - 1; k >= 0; k--) {
+            double val = C_polys[j][k];
+            double rounded = (val >= 0) ? (int)(val + 0.5) : (int)(val - 0.5);
+            if (fabs(val - rounded) < 1e-9) val = rounded;
+            if (fabs(val) < 1e-9) continue;
+
+            if (first_coef) {
+                format_coeff(buf, sizeof(buf), val);
+                fprintf(out, "%s", buf);
+                first_coef = 0;
+            } else {
+                if (val >= 0) {
+                    format_coeff(buf, sizeof(buf), val);
+                    fprintf(out, " + %s", buf);
+                } else {
+                    format_coeff(buf, sizeof(buf), -val);
+                    fprintf(out, " - %s", buf);
+                }
+            }
+            if (k > 1) fprintf(out, "*x^%d", k);
+            else if (k == 1) fprintf(out, "*x");
+        }
+        if (first_coef) fprintf(out, "0");
+        fprintf(out, ")");
+    }
+    if (first_term) fprintf(out, "0");
+    fprintf(out, "\n\n");
+
+    fprintf(out, "P(x) = (w.A(x)) * (w.B(x)) - (w.C(x)) = H(x) * T(x)\n");
+
+    /* Free polynomial storage */
+    for (int j = 0; j < n_vars; j++) {
+        free(A_polys[j]);
+        free(B_polys[j]);
+        free(C_polys[j]);
+    }
+    free(A_polys);
+    free(B_polys);
+    free(C_polys);
 
     /* Cleanup */
     free(col_vals);
