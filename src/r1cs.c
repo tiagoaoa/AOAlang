@@ -913,6 +913,35 @@ void r1cs_generate_qap(FILE *out) {
     }
     fprintf(out, "\n");
 
+    /* Print the combined P(x) expression */
+    fprintf(out, "\n# P(x) = (w.A(x)) * (w.B(x)) - (w.C(x))\n\n");
+
+    /* Print w.A(x) */
+    fprintf(out, "w.A(x) = ");
+    for (int j = 0; j < n_vars; j++) {
+        if (j > 0) fprintf(out, " + ");
+        fprintf(out, "%s*A_%s(x)", r1cs.witnesses[j].name, r1cs.witnesses[j].name);
+    }
+    fprintf(out, "\n");
+
+    /* Print w.B(x) */
+    fprintf(out, "w.B(x) = ");
+    for (int j = 0; j < n_vars; j++) {
+        if (j > 0) fprintf(out, " + ");
+        fprintf(out, "%s*B_%s(x)", r1cs.witnesses[j].name, r1cs.witnesses[j].name);
+    }
+    fprintf(out, "\n");
+
+    /* Print w.C(x) */
+    fprintf(out, "w.C(x) = ");
+    for (int j = 0; j < n_vars; j++) {
+        if (j > 0) fprintf(out, " + ");
+        fprintf(out, "%s*C_%s(x)", r1cs.witnesses[j].name, r1cs.witnesses[j].name);
+    }
+    fprintf(out, "\n");
+
+    fprintf(out, "\nP(x) = (w.A(x)) * (w.B(x)) - (w.C(x)) = H(x) * T(x)\n");
+
     /* Cleanup */
     free(col_vals);
     free(coeffs);
