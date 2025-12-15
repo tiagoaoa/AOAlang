@@ -1075,7 +1075,137 @@ void r1cs_generate_qap(FILE *out) {
     if (first_term) fprintf(out, "0");
     fprintf(out, "\n\n");
 
-    fprintf(out, "P(x) = (w.A(x)) * (w.B(x)) - (w.C(x)) = H(x) * T(x)\n");
+    fprintf(out, "P(x) = (w.A(x)) * (w.B(x)) - (w.C(x)) = H(x) * T(x)\n\n");
+
+    /* Compute simplified P(x) with coefficients for each power of x */
+    /* P(x) = w.A(x) * w.B(x) - w.C(x)
+     * w.A(x) and w.B(x) each have degree n_cons-1, so product has degree 2*(n_cons-1)
+     * Each coefficient of x^k is an expression in witness variables
+     */
+    int p_degree = 2 * (n_cons - 1);
+
+    /* Build coefficient matrix for quadratic terms: coef_quad[i][j] for w_i * w_j
+     * and linear terms: coef_lin[i] for w_i (from -w.C(x))
+     * For each power of x */
+    fprintf(out, "# Simplified P(x) - coefficients are expressions in witness variables\n\n");
+
+    for (int m = p_degree; m >= 0; m--) {
+        /* Allocate and zero coefficient accumulators */
+        double **coef_quad = malloc(n_vars * sizeof(double *));
+        double *coef_lin = calloc(n_vars, sizeof(double));
+        for (int i = 0; i < n_vars; i++) {
+            coef_quad[i] = calloc(n_vars, sizeof(double));
+        }
+
+        /* Accumulate terms from w.A(x) * w.B(x) */
+        for (int k = 0; k <= m && k < n_cons; k++) {
+            int l = m - k;
+            if (l < 0 || l >= n_cons) continue;
+
+            for (int i = 0; i < n_vars; i++) {
+                double a_ik = A_polys[i][k];
+                if (fabs(a_ik) < 1e-9) continue;
+
+                for (int j = 0; j < n_vars; j++) {
+                    double b_jl = B_polys[j][l];
+                    if (fabs(b_jl) < 1e-9) continue;
+
+                    /* Combine w_i*w_j and w_j*w_i into w_i*w_j where i <= j */
+                    if (i <= j) {
+                        coef_quad[i][j] += a_ik * b_jl;
+                    } else {
+                        coef_quad[j][i] += a_ik * b_jl;
+                    }
+                }
+            }
+        }
+
+        /* Subtract terms from w.C(x) */
+        if (m < n_cons) {
+            for (int i = 0; i < n_vars; i++) {
+                coef_lin[i] -= C_polys[i][m];
+            }
+        }
+
+        /* Print coefficient for x^m */
+        fprintf(out, "coef(x^%d) = ", m);
+        int first = 1;
+
+        /* Print quadratic terms */
+        for (int i = 0; i < n_vars; i++) {
+            for (int j = i; j < n_vars; j++) {
+                double c = coef_quad[i][j];
+                double c_r = (c >= 0) ? (int)(c + 0.5) : (int)(c - 0.5);
+                if (fabs(c - c_r) < 1e-9) c = c_r;
+                if (fabs(c) < 1e-9) continue;
+
+                if (!first) fprintf(out, c >= 0 ? " + " : " - ");
+                else if (c < 0) fprintf(out, "-");
+                first = 0;
+
+                format_coeff(buf, sizeof(buf), fabs(c));
+
+                /* Special handling for constant "1" */
+                int i_is_one = (strcmp(r1cs.witnesses[i].name, "1") == 0);
+                int j_is_one = (strcmp(r1cs.witnesses[j].name, "1") == 0);
+
+                if (i_is_one && j_is_one) {
+                    fprintf(out, "%s", buf);  /* Just the coefficient */
+                } else if (i_is_one) {
+                    fprintf(out, "%s*%s", buf, r1cs.witnesses[j].name);
+                } else if (j_is_one) {
+                    fprintf(out, "%s*%s", buf, r1cs.witnesses[i].name);
+                } else if (i == j) {
+                    fprintf(out, "%s*%s^2", buf, r1cs.witnesses[i].name);
+                } else {
+                    fprintf(out, "%s*%s*%s", buf, r1cs.witnesses[i].name, r1cs.witnesses[j].name);
+                }
+            }
+        }
+
+        /* Print linear terms (from -w.C) */
+        for (int i = 0; i < n_vars; i++) {
+            double c = coef_lin[i];
+            double c_r = (c >= 0) ? (int)(c + 0.5) : (int)(c - 0.5);
+            if (fabs(c - c_r) < 1e-9) c = c_r;
+            if (fabs(c) < 1e-9) continue;
+
+            /* Skip if witness is "1" - already handled in quadratic */
+            if (strcmp(r1cs.witnesses[i].name, "1") == 0) {
+                if (!first) fprintf(out, c >= 0 ? " + " : " - ");
+                else if (c < 0) fprintf(out, "-");
+                first = 0;
+                format_coeff(buf, sizeof(buf), fabs(c));
+                fprintf(out, "%s", buf);
+                continue;
+            }
+
+            if (!first) fprintf(out, c >= 0 ? " + " : " - ");
+            else if (c < 0) fprintf(out, "-");
+            first = 0;
+
+            format_coeff(buf, sizeof(buf), fabs(c));
+            fprintf(out, "%s*%s", buf, r1cs.witnesses[i].name);
+        }
+
+        if (first) fprintf(out, "0");
+        fprintf(out, "\n");
+
+        /* Free */
+        for (int i = 0; i < n_vars; i++) free(coef_quad[i]);
+        free(coef_quad);
+        free(coef_lin);
+    }
+
+    /* Print final P(x) formula */
+    fprintf(out, "\nP(x) = ");
+    for (int m = p_degree; m >= 0; m--) {
+        if (m < p_degree) fprintf(out, " + ");
+        fprintf(out, "coef(x^%d)", m);
+        if (m > 1) fprintf(out, "*x^%d", m);
+        else if (m == 1) fprintf(out, "*x");
+    }
+    fprintf(out, "\n");
 
     /* Free polynomial storage */
     for (int j = 0; j < n_vars; j++) {
