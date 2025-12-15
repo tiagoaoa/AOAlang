@@ -21,6 +21,7 @@ static int verbose = 0;
 static int generate = 0;
 static int dense_output = 0;
 static int qap_output = 0;
+static int c_checker_output = 0;
 static char *output_file = NULL;
 
 void print_usage(const char *prog_name) {
@@ -30,6 +31,7 @@ void print_usage(const char *prog_name) {
     fprintf(stderr, "  -g, --generate  Generate R1CS JSON output\n");
     fprintf(stderr, "  -d, --dense     Generate dense R1CS matrix output (.r1cs)\n");
     fprintf(stderr, "  -q, --qap       Generate QAP polynomial output (.qap)\n");
+    fprintf(stderr, "  -c, --checker   Generate C sanity checker (.c)\n");
     fprintf(stderr, "  -o FILE         Output file (default: <input>.<ext>)\n");
     fprintf(stderr, "  -h, --help      Show this help message\n");
     fprintf(stderr, "\nValidates AOA (.aoa) constraint files and optionally generates output.\n");
@@ -38,6 +40,7 @@ void print_usage(const char *prog_name) {
     fprintf(stderr, "  %s -g circuit.aoa           # Generate R1CS JSON\n", prog_name);
     fprintf(stderr, "  %s -d circuit.aoa           # Generate dense R1CS\n", prog_name);
     fprintf(stderr, "  %s -q circuit.aoa           # Generate QAP polynomials\n", prog_name);
+    fprintf(stderr, "  %s -c circuit.aoa           # Generate C checker\n", prog_name);
     fprintf(stderr, "  %s -v examples/quadratic.aoa\n", prog_name);
 }
 
@@ -59,10 +62,10 @@ char *get_circuit_name(const char *filename) {
 }
 
 /* Generate default output filename */
-char *get_default_output(const char *input_file, int dense, int qap) {
+char *get_default_output(const char *input_file, int dense, int qap, int c_checker) {
     size_t len = strlen(input_file);
-    const char *ext = qap ? ".qap" : (dense ? ".r1cs" : ".r1cs.json");
-    char *output = malloc(len + 12);  /* .r1cs.json + null */
+    const char *ext = c_checker ? "_checker.c" : (qap ? ".qap" : (dense ? ".r1cs" : ".r1cs.json"));
+    char *output = malloc(len + 16);  /* _checker.c + null */
 
     /* Check if input ends with .aoa */
     if (len > 4 && strcmp(input_file + len - 4, ".aoa") == 0) {
@@ -82,7 +85,7 @@ int main(int argc, char **argv) {
     const char *filename = NULL;
 
     /* Parse command-line options */
-    while ((opt = getopt(argc, argv, "vgdqho:")) != -1) {
+    while ((opt = getopt(argc, argv, "vgdqcho:")) != -1) {
         switch (opt) {
             case 'v':
                 verbose = 1;
@@ -97,6 +100,10 @@ int main(int argc, char **argv) {
             case 'q':
                 generate = 1;
                 qap_output = 1;
+                break;
+            case 'c':
+                generate = 1;
+                c_checker_output = 1;
                 break;
             case 'o':
                 output_file = strdup(optarg);
@@ -120,6 +127,9 @@ int main(int argc, char **argv) {
         } else if (strcmp(argv[i], "--qap") == 0) {
             generate = 1;
             qap_output = 1;
+        } else if (strcmp(argv[i], "--checker") == 0) {
+            generate = 1;
+            c_checker_output = 1;
         } else if (strcmp(argv[i], "--help") == 0) {
             print_usage(argv[0]);
             return 0;
@@ -184,7 +194,7 @@ int main(int argc, char **argv) {
         if (generate) {
             /* Generate output file */
             if (!output_file) {
-                output_file = get_default_output(filename, dense_output, qap_output);
+                output_file = get_default_output(filename, dense_output, qap_output, c_checker_output);
             }
 
             FILE *out = fopen(output_file, "w");
@@ -195,7 +205,13 @@ int main(int argc, char **argv) {
                 return 1;
             }
 
-            if (qap_output) {
+            char *circuit_name = get_circuit_name(filename);
+
+            if (c_checker_output) {
+                r1cs_generate_c_checker(out, circuit_name);
+                fclose(out);
+                printf("Generated C checker: %s\n", output_file);
+            } else if (qap_output) {
                 r1cs_generate_qap(out);
                 fclose(out);
                 printf("Generated QAP: %s\n", output_file);
@@ -204,12 +220,12 @@ int main(int argc, char **argv) {
                 fclose(out);
                 printf("Generated R1CS dense: %s\n", output_file);
             } else {
-                char *circuit_name = get_circuit_name(filename);
                 r1cs_generate_json(out, circuit_name);
                 fclose(out);
                 printf("Generated R1CS JSON: %s\n", output_file);
-                free(circuit_name);
             }
+
+            free(circuit_name);
             printf("  Witnesses: %d\n", r1cs.n_witnesses);
             printf("  Constraints: %d\n", r1cs.n_constraints);
             printf("  Public inputs: %d\n", r1cs.n_public_inputs);

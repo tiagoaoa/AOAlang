@@ -161,6 +161,22 @@ test-qap: $(TARGET)
 		exit 1; \
 	fi
 
+# Test C checker generation
+test-checker: $(TARGET)
+	@echo "Testing C checker generation..."
+	@test_failed=0; \
+	for file in $(EXAMPLESDIR)/*.aoa; do \
+		echo "Generating C checker for $$file..."; \
+		$(TARGET) -c "$$file" || test_failed=$$((test_failed + 1)); \
+		echo ""; \
+	done; \
+	if [ $$test_failed -eq 0 ]; then \
+		echo "All C checker generation tests passed!"; \
+	else \
+		echo "$$test_failed test(s) failed"; \
+		exit 1; \
+	fi
+
 # Install to system (requires root)
 install: $(TARGET)
 	install -d /usr/local/bin
@@ -200,6 +216,7 @@ help:
 	@echo "  test-generate - Test R1CS JSON generation for all examples"
 	@echo "  test-dense    - Test dense R1CS generation for all examples"
 	@echo "  test-qap      - Test QAP polynomial generation for all examples"
+	@echo "  test-checker  - Test C checker generation for all examples"
 	@echo ""
 	@echo "Install Targets:"
 	@echo "  install       - Install to /usr/local/bin (requires sudo)"
@@ -208,4 +225,4 @@ help:
 	@echo "Other Targets:"
 	@echo "  help          - Show this help message"
 
-.PHONY: all test test-all test-errors test-generate test-dense test-qap install uninstall clean distclean help
+.PHONY: all test test-all test-errors test-generate test-dense test-qap test-checker install uninstall clean distclean help

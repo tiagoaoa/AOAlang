@@ -151,6 +151,9 @@ void r1cs_generate_dense(FILE *out);
 /* Generate QAP polynomial output (.qap format) */
 void r1cs_generate_qap(FILE *out);
 
+/* Generate C sanity checker (.c format) */
+void r1cs_generate_c_checker(FILE *out, const char *circuit_name);
+
 /* Expression node helpers */
 expr_node_t *expr_create_var(const char *name);
 expr_node_t *expr_create_array(const char *name, int index);

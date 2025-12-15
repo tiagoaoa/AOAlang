@@ -54,7 +54,8 @@ missing
 test-output/
 *.test
 
-# Generated R1CS and QAP files
+# Generated R1CS, QAP, and checker files
 *.r1cs.json
 *.r1cs
 *.qap
+examples/*_checker.c
