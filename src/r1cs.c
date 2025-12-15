@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 #include "r1cs.h"
 #include "symbol_table.h"
 
@@ -693,6 +694,190 @@ void r1cs_generate_dense(FILE *out) {
         fprintf(out, "]\n");
         free(row);
     }
+}
+
+/*
+ * Lagrange interpolation for QAP generation
+ * Given values y[0..n-1] at points x=1,2,...,n, compute polynomial coefficients
+ * Returns coefficients c[0..n-1] where P(x) = c[0] + c[1]*x + c[2]*x^2 + ...
+ */
+static void lagrange_interpolate(int n, int *y, double *coeffs) {
+    /* Initialize coefficients to zero */
+    for (int i = 0; i < n; i++) {
+        coeffs[i] = 0.0;
+    }
+
+    /* For each point, add its Lagrange basis polynomial scaled by y[i] */
+    for (int i = 0; i < n; i++) {
+        if (y[i] == 0) continue;  /* Skip if y value is zero */
+
+        /* Compute L_i(x) = product of (x - j) / (i+1 - j) for j != i+1 */
+        /* We work with x-values 1, 2, ..., n (not 0-indexed) */
+        int xi = i + 1;  /* x-value for this point */
+
+        /* Start with polynomial = y[i] (constant) */
+        double basis[MAX_CONSTRAINTS];
+        for (int k = 0; k < n; k++) basis[k] = 0.0;
+        basis[0] = (double)y[i];
+
+        /* Multiply by (x - xj) / (xi - xj) for each j != i */
+        for (int j = 0; j < n; j++) {
+            if (j == i) continue;
+            int xj = j + 1;
+            double denom = (double)(xi - xj);
+
+            /* Multiply current polynomial by (x - xj) / denom */
+            /* If P(x) = sum(basis[k] * x^k), then P(x) * (x - xj) =
+               sum(basis[k] * x^(k+1)) - xj * sum(basis[k] * x^k) */
+            double new_basis[MAX_CONSTRAINTS];
+            for (int k = 0; k < n; k++) new_basis[k] = 0.0;
+
+            for (int k = 0; k < n; k++) {
+                if (basis[k] != 0.0) {
+                    /* x^k * (x - xj) = x^(k+1) - xj * x^k */
+                    if (k + 1 < n) {
+                        new_basis[k + 1] += basis[k] / denom;
+                    }
+                    new_basis[k] -= (xj * basis[k]) / denom;
+                }
+            }
+
+            for (int k = 0; k < n; k++) basis[k] = new_basis[k];
+        }
+
+        /* Add this basis polynomial to the result */
+        for (int k = 0; k < n; k++) {
+            coeffs[k] += basis[k];
+        }
+    }
+}
+
+/* Helper to print polynomial coefficients, rounding near-integers */
+static void print_poly_coeffs(FILE *out, double *coeffs, int n) {
+    fprintf(out, "[");
+    for (int i = 0; i < n; i++) {
+        /* Round to nearest integer if very close */
+        double val = coeffs[i];
+        double rounded = (val >= 0) ? (int)(val + 0.5) : (int)(val - 0.5);
+        if (fabs(val - rounded) < 1e-9) {
+            fprintf(out, "%.0f", rounded);
+        } else {
+            fprintf(out, "%.6g", val);
+        }
+        if (i < n - 1) fprintf(out, ", ");
+    }
+    fprintf(out, "]");
+}
+
+void r1cs_generate_qap(FILE *out) {
+    r1cs_build_partition();
+
+    int n_vars = r1cs.n_witnesses;
+    int n_cons = r1cs.n_constraints;
+
+    if (n_cons == 0) {
+        fprintf(out, "# No constraints\n");
+        return;
+    }
+
+    /* Build dense matrices */
+    int **A_dense = malloc(n_cons * sizeof(int *));
+    int **B_dense = malloc(n_cons * sizeof(int *));
+    int **C_dense = malloc(n_cons * sizeof(int *));
+
+    for (int i = 0; i < n_cons; i++) {
+        A_dense[i] = calloc(n_vars, sizeof(int));
+        B_dense[i] = calloc(n_vars, sizeof(int));
+        C_dense[i] = calloc(n_vars, sizeof(int));
+
+        r1cs_constraint_t *c = &r1cs.constraints[i];
+        for (int j = 0; j < c->A_count; j++) {
+            A_dense[i][c->A[j].col] = c->A[j].coeff;
+        }
+        for (int j = 0; j < c->B_count; j++) {
+            B_dense[i][c->B[j].col] = c->B[j].coeff;
+        }
+        for (int j = 0; j < c->C_count; j++) {
+            C_dense[i][c->C[j].col] = c->C[j].coeff;
+        }
+    }
+
+    /* Print header */
+    fprintf(out, "# QAP (Quadratic Arithmetic Program)\n");
+    fprintf(out, "# Polynomials interpolated at x = 1, 2, ..., %d\n", n_cons);
+    fprintf(out, "# Coefficients: [const, x, x^2, ...]\n");
+    fprintf(out, "# P(x) = (w.A(x)) * (w.B(x)) - (w.C(x)) = H(x) * T(x)\n");
+    fprintf(out, "# T(x) = (x-1)(x-2)...(x-%d)\n\n", n_cons);
+
+    /* Print witness vector */
+    fprintf(out, "w = [");
+    for (int i = 0; i < n_vars; i++) {
+        fprintf(out, "%s", r1cs.witnesses[i].name);
+        if (i < n_vars - 1) fprintf(out, ", ");
+    }
+    fprintf(out, "]\n\n");
+
+    /* Allocate space for column values and coefficients */
+    int *col_vals = malloc(n_cons * sizeof(int));
+    double *coeffs = malloc(n_cons * sizeof(double));
+
+    /* Print A polynomials */
+    fprintf(out, "A(x) polynomials:\n");
+    for (int j = 0; j < n_vars; j++) {
+        /* Extract column j from A */
+        for (int i = 0; i < n_cons; i++) {
+            col_vals[i] = A_dense[i][j];
+        }
+        lagrange_interpolate(n_cons, col_vals, coeffs);
+        fprintf(out, "  A_%s(x) = ", r1cs.witnesses[j].name);
+        print_poly_coeffs(out, coeffs, n_cons);
+        fprintf(out, "\n");
+    }
+
+    /* Print B polynomials */
+    fprintf(out, "\nB(x) polynomials:\n");
+    for (int j = 0; j < n_vars; j++) {
+        /* Extract column j from B */
+        for (int i = 0; i < n_cons; i++) {
+            col_vals[i] = B_dense[i][j];
+        }
+        lagrange_interpolate(n_cons, col_vals, coeffs);
+        fprintf(out, "  B_%s(x) = ", r1cs.witnesses[j].name);
+        print_poly_coeffs(out, coeffs, n_cons);
+        fprintf(out, "\n");
+    }
+
+    /* Print C polynomials */
+    fprintf(out, "\nC(x) polynomials:\n");
+    for (int j = 0; j < n_vars; j++) {
+        /* Extract column j from C */
+        for (int i = 0; i < n_cons; i++) {
+            col_vals[i] = C_dense[i][j];
+        }
+        lagrange_interpolate(n_cons, col_vals, coeffs);
+        fprintf(out, "  C_%s(x) = ", r1cs.witnesses[j].name);
+        print_poly_coeffs(out, coeffs, n_cons);
+        fprintf(out, "\n");
+    }
+
+    /* Print target polynomial T(x) = (x-1)(x-2)...(x-n) */
+    fprintf(out, "\nT(x) = ");
+    for (int i = 1; i <= n_cons; i++) {
+        fprintf(out, "(x-%d)", i);
+    }
+    fprintf(out, "\n");
+
+    /* Cleanup */
+    free(col_vals);
+    free(coeffs);
+    for (int i = 0; i < n_cons; i++) {
+        free(A_dense[i]);
+        free(B_dense[i]);
+        free(C_dense[i]);
+    }
+    free(A_dense);
+    free(B_dense);
+    free(C_dense);
 }
 
 void r1cs_print(void) {

@@ -54,6 +54,7 @@ missing
 test-output/
 *.test
 
-# Generated R1CS files
+# Generated R1CS and QAP files
 *.r1cs.json
 *.r1cs
+*.qap

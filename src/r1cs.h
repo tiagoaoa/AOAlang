@@ -148,6 +148,9 @@ void r1cs_print(void);
 /* Generate dense matrix output (.r1cs format) */
 void r1cs_generate_dense(FILE *out);
 
+/* Generate QAP polynomial output (.qap format) */
+void r1cs_generate_qap(FILE *out);
+
 /* Expression node helpers */
 expr_node_t *expr_create_var(const char *name);
 expr_node_t *expr_create_array(const char *name, int index);

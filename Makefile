@@ -145,6 +145,22 @@ test-dense: $(TARGET)
 		exit 1; \
 	fi
 
+# Test QAP generation
+test-qap: $(TARGET)
+	@echo "Testing QAP generation..."
+	@test_failed=0; \
+	for file in $(EXAMPLESDIR)/*.aoa; do \
+		echo "Generating QAP for $$file..."; \
+		$(TARGET) -q "$$file" || test_failed=$$((test_failed + 1)); \
+		echo ""; \
+	done; \
+	if [ $$test_failed -eq 0 ]; then \
+		echo "All QAP generation tests passed!"; \
+	else \
+		echo "$$test_failed test(s) failed"; \
+		exit 1; \
+	fi
+
 # Install to system (requires root)
 install: $(TARGET)
 	install -d /usr/local/bin
@@ -183,6 +199,7 @@ help:
 	@echo "  test-errors   - Test error detection only"
 	@echo "  test-generate - Test R1CS JSON generation for all examples"
 	@echo "  test-dense    - Test dense R1CS generation for all examples"
+	@echo "  test-qap      - Test QAP polynomial generation for all examples"
 	@echo ""
 	@echo "Install Targets:"
 	@echo "  install       - Install to /usr/local/bin (requires sudo)"
@@ -191,4 +208,4 @@ help:
 	@echo "Other Targets:"
 	@echo "  help          - Show this help message"
 
-.PHONY: all test test-all test-errors test-generate test-dense install uninstall clean distclean help
+.PHONY: all test test-all test-errors test-generate test-dense test-qap install uninstall clean distclean help

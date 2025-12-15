@@ -20,6 +20,7 @@ extern int generate_r1cs;
 static int verbose = 0;
 static int generate = 0;
 static int dense_output = 0;
+static int qap_output = 0;
 static char *output_file = NULL;
 
 void print_usage(const char *prog_name) {
@@ -28,14 +29,15 @@ void print_usage(const char *prog_name) {
     fprintf(stderr, "  -v              Verbose output (show symbol table)\n");
     fprintf(stderr, "  -g, --generate  Generate R1CS JSON output\n");
     fprintf(stderr, "  -d, --dense     Generate dense R1CS matrix output (.r1cs)\n");
-    fprintf(stderr, "  -o FILE         Output file (default: <input>.r1cs.json or .r1cs)\n");
+    fprintf(stderr, "  -q, --qap       Generate QAP polynomial output (.qap)\n");
+    fprintf(stderr, "  -o FILE         Output file (default: <input>.<ext>)\n");
     fprintf(stderr, "  -h, --help      Show this help message\n");
-    fprintf(stderr, "\nValidates AOA (.aoa) constraint files and optionally generates R1CS output.\n");
+    fprintf(stderr, "\nValidates AOA (.aoa) constraint files and optionally generates output.\n");
     fprintf(stderr, "\nExamples:\n");
     fprintf(stderr, "  %s circuit.aoa              # Validate only\n", prog_name);
-    fprintf(stderr, "  %s -g circuit.aoa           # Validate and generate JSON\n", prog_name);
-    fprintf(stderr, "  %s -d circuit.aoa           # Generate dense matrix format\n", prog_name);
-    fprintf(stderr, "  %s -g -o out.json circuit.aoa\n", prog_name);
+    fprintf(stderr, "  %s -g circuit.aoa           # Generate R1CS JSON\n", prog_name);
+    fprintf(stderr, "  %s -d circuit.aoa           # Generate dense R1CS\n", prog_name);
+    fprintf(stderr, "  %s -q circuit.aoa           # Generate QAP polynomials\n", prog_name);
     fprintf(stderr, "  %s -v examples/quadratic.aoa\n", prog_name);
 }
 
@@ -57,9 +59,9 @@ char *get_circuit_name(const char *filename) {
 }
 
 /* Generate default output filename */
-char *get_default_output(const char *input_file, int dense) {
+char *get_default_output(const char *input_file, int dense, int qap) {
     size_t len = strlen(input_file);
-    const char *ext = dense ? ".r1cs" : ".r1cs.json";
+    const char *ext = qap ? ".qap" : (dense ? ".r1cs" : ".r1cs.json");
     char *output = malloc(len + 12);  /* .r1cs.json + null */
 
     /* Check if input ends with .aoa */
@@ -80,7 +82,7 @@ int main(int argc, char **argv) {
     const char *filename = NULL;
 
     /* Parse command-line options */
-    while ((opt = getopt(argc, argv, "vgdho:")) != -1) {
+    while ((opt = getopt(argc, argv, "vgdqho:")) != -1) {
         switch (opt) {
             case 'v':
                 verbose = 1;
@@ -91,6 +93,10 @@ int main(int argc, char **argv) {
             case 'd':
                 generate = 1;
                 dense_output = 1;
+                break;
+            case 'q':
+                generate = 1;
+                qap_output = 1;
                 break;
             case 'o':
                 output_file = strdup(optarg);
@@ -104,13 +110,16 @@ int main(int argc, char **argv) {
         }
     }
 
-    /* Check for --generate, --dense, and --help long options */
+    /* Check for long options */
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--generate") == 0) {
             generate = 1;
         } else if (strcmp(argv[i], "--dense") == 0) {
             generate = 1;
             dense_output = 1;
+        } else if (strcmp(argv[i], "--qap") == 0) {
+            generate = 1;
+            qap_output = 1;
         } else if (strcmp(argv[i], "--help") == 0) {
             print_usage(argv[0]);
             return 0;
@@ -175,7 +184,7 @@ int main(int argc, char **argv) {
         if (generate) {
             /* Generate output file */
             if (!output_file) {
-                output_file = get_default_output(filename, dense_output);
+                output_file = get_default_output(filename, dense_output, qap_output);
             }
 
             FILE *out = fopen(output_file, "w");
@@ -186,7 +195,11 @@ int main(int argc, char **argv) {
                 return 1;
             }
 
-            if (dense_output) {
+            if (qap_output) {
+                r1cs_generate_qap(out);
+                fclose(out);
+                printf("Generated QAP: %s\n", output_file);
+            } else if (dense_output) {
                 r1cs_generate_dense(out);
                 fclose(out);
                 printf("Generated R1CS dense: %s\n", output_file);
