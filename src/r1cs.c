@@ -623,6 +623,14 @@ void r1cs_generate_dense(FILE *out) {
     int n_vars = r1cs.n_witnesses;
     int n_cons = r1cs.n_constraints;
 
+    /* Print witness vector */
+    fprintf(out, "w = [");
+    for (int i = 0; i < n_vars; i++) {
+        fprintf(out, "%s", r1cs.witnesses[i].name);
+        if (i < n_vars - 1) fprintf(out, ", ");
+    }
+    fprintf(out, "]\n");
+
     /* Print A matrix */
     fprintf(out, "A\n");
     for (int i = 0; i < n_cons; i++) {
