@@ -54,5 +54,6 @@ missing
 test-output/
 *.test
 
-# Generated R1CS JSON files
+# Generated R1CS files
 *.r1cs.json
+*.r1cs

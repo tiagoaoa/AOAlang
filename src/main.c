@@ -19,6 +19,7 @@ extern int generate_r1cs;
 
 static int verbose = 0;
 static int generate = 0;
+static int dense_output = 0;
 static char *output_file = NULL;
 
 void print_usage(const char *prog_name) {
@@ -26,12 +27,14 @@ void print_usage(const char *prog_name) {
     fprintf(stderr, "\nOptions:\n");
     fprintf(stderr, "  -v              Verbose output (show symbol table)\n");
     fprintf(stderr, "  -g, --generate  Generate R1CS JSON output\n");
-    fprintf(stderr, "  -o FILE         Output file (default: <input>.r1cs.json)\n");
+    fprintf(stderr, "  -d, --dense     Generate dense R1CS matrix output (.r1cs)\n");
+    fprintf(stderr, "  -o FILE         Output file (default: <input>.r1cs.json or .r1cs)\n");
     fprintf(stderr, "  -h, --help      Show this help message\n");
-    fprintf(stderr, "\nValidates AOA (.aoa) constraint files and optionally generates R1CS JSON.\n");
+    fprintf(stderr, "\nValidates AOA (.aoa) constraint files and optionally generates R1CS output.\n");
     fprintf(stderr, "\nExamples:\n");
     fprintf(stderr, "  %s circuit.aoa              # Validate only\n", prog_name);
     fprintf(stderr, "  %s -g circuit.aoa           # Validate and generate JSON\n", prog_name);
+    fprintf(stderr, "  %s -d circuit.aoa           # Generate dense matrix format\n", prog_name);
     fprintf(stderr, "  %s -g -o out.json circuit.aoa\n", prog_name);
     fprintf(stderr, "  %s -v examples/quadratic.aoa\n", prog_name);
 }
@@ -54,18 +57,19 @@ char *get_circuit_name(const char *filename) {
 }
 
 /* Generate default output filename */
-char *get_default_output(const char *input_file) {
+char *get_default_output(const char *input_file, int dense) {
     size_t len = strlen(input_file);
+    const char *ext = dense ? ".r1cs" : ".r1cs.json";
     char *output = malloc(len + 12);  /* .r1cs.json + null */
 
     /* Check if input ends with .aoa */
     if (len > 4 && strcmp(input_file + len - 4, ".aoa") == 0) {
         strncpy(output, input_file, len - 4);
         output[len - 4] = '\0';
-        strcat(output, ".r1cs.json");
+        strcat(output, ext);
     } else {
         strcpy(output, input_file);
-        strcat(output, ".r1cs.json");
+        strcat(output, ext);
     }
 
     return output;
@@ -76,13 +80,17 @@ int main(int argc, char **argv) {
     const char *filename = NULL;
 
     /* Parse command-line options */
-    while ((opt = getopt(argc, argv, "vgho:")) != -1) {
+    while ((opt = getopt(argc, argv, "vgdho:")) != -1) {
         switch (opt) {
             case 'v':
                 verbose = 1;
                 break;
             case 'g':
                 generate = 1;
+                break;
+            case 'd':
+                generate = 1;
+                dense_output = 1;
                 break;
             case 'o':
                 output_file = strdup(optarg);
@@ -96,10 +104,13 @@ int main(int argc, char **argv) {
         }
     }
 
-    /* Check for --generate and --help long options */
+    /* Check for --generate, --dense, and --help long options */
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--generate") == 0) {
             generate = 1;
+        } else if (strcmp(argv[i], "--dense") == 0) {
+            generate = 1;
+            dense_output = 1;
         } else if (strcmp(argv[i], "--help") == 0) {
             print_usage(argv[0]);
             return 0;
@@ -164,7 +175,7 @@ int main(int argc, char **argv) {
         if (generate) {
             /* Generate output file */
             if (!output_file) {
-                output_file = get_default_output(filename);
+                output_file = get_default_output(filename, dense_output);
             }
 
             FILE *out = fopen(output_file, "w");
@@ -175,11 +186,17 @@ int main(int argc, char **argv) {
                 return 1;
             }
 
-            char *circuit_name = get_circuit_name(filename);
-            r1cs_generate_json(out, circuit_name);
-            fclose(out);
-
-            printf("Generated R1CS JSON: %s\n", output_file);
+            if (dense_output) {
+                r1cs_generate_dense(out);
+                fclose(out);
+                printf("Generated R1CS dense: %s\n", output_file);
+            } else {
+                char *circuit_name = get_circuit_name(filename);
+                r1cs_generate_json(out, circuit_name);
+                fclose(out);
+                printf("Generated R1CS JSON: %s\n", output_file);
+                free(circuit_name);
+            }
             printf("  Witnesses: %d\n", r1cs.n_witnesses);
             printf("  Constraints: %d\n", r1cs.n_constraints);
             printf("  Public inputs: %d\n", r1cs.n_public_inputs);
@@ -188,7 +205,6 @@ int main(int argc, char **argv) {
                 r1cs_print();
             }
 
-            free(circuit_name);
             r1cs_free();
         } else {
             printf("Validation successful - %s is valid AOA\n", filename);

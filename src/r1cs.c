@@ -217,12 +217,24 @@ int r1cs_get_witness_index(const char *var_name) {
     return -1;
 }
 
-void r1cs_add_mul_constraint(const char *result, const char *left, const char *right) {
-    int left_idx = r1cs_get_witness_index(left);
-    int right_idx = r1cs_get_witness_index(right);
-    int result_idx = r1cs_get_witness_index(result);
+/* Helper to check if string is a numeric constant and get its value */
+static int is_constant(const char *str, int *value) {
+    char *endptr;
+    long val = strtol(str, &endptr, 10);
+    if (*endptr == '\0') {
+        *value = (int)val;
+        return 1;
+    }
+    return 0;
+}
 
-    if (left_idx < 0 || right_idx < 0 || result_idx < 0) {
+void r1cs_add_mul_constraint(const char *result, const char *left, const char *right) {
+    int result_idx = r1cs_get_witness_index(result);
+    int left_const_val, right_const_val;
+    int left_is_const = is_constant(left, &left_const_val);
+    int right_is_const = is_constant(right, &right_const_val);
+
+    if (result_idx < 0) {
         fprintf(stderr, "Error: Invalid variable in multiplication constraint\n");
         return;
     }
@@ -231,8 +243,27 @@ void r1cs_add_mul_constraint(const char *result, const char *left, const char *r
     snprintf(comment, sizeof(comment), "%s = %s * %s", result, left, right);
 
     r1cs_begin_constraint(result, comment);
-    r1cs_add_A(left_idx, 1);
-    r1cs_add_B(right_idx, 1);
+
+    /* Handle multiplication with constants:
+     * const * var: A[0]=const, B[var]=1, C[result]=1
+     * var * const: A[var]=1, B[0]=const, C[result]=1
+     * var * var: A[var1]=1, B[var2]=1, C[result]=1
+     * const * const: should be folded, but handle anyway
+     */
+    if (left_is_const) {
+        r1cs_add_A(0, left_const_val);
+    } else {
+        int left_idx = r1cs_get_witness_index(left);
+        if (left_idx >= 0) r1cs_add_A(left_idx, 1);
+    }
+
+    if (right_is_const) {
+        r1cs_add_B(0, right_const_val);
+    } else {
+        int right_idx = r1cs_get_witness_index(right);
+        if (right_idx >= 0) r1cs_add_B(right_idx, 1);
+    }
+
     r1cs_add_C(result_idx, 1);
     r1cs_end_constraint();
 
@@ -243,11 +274,12 @@ void r1cs_add_mul_constraint(const char *result, const char *left, const char *r
 }
 
 void r1cs_add_add_constraint(const char *result, const char *left, const char *right) {
-    int left_idx = r1cs_get_witness_index(left);
-    int right_idx = r1cs_get_witness_index(right);
     int result_idx = r1cs_get_witness_index(result);
+    int left_const_val, right_const_val;
+    int left_is_const = is_constant(left, &left_const_val);
+    int right_is_const = is_constant(right, &right_const_val);
 
-    if (left_idx < 0 || right_idx < 0 || result_idx < 0) {
+    if (result_idx < 0) {
         fprintf(stderr, "Error: Invalid variable in addition constraint\n");
         return;
     }
@@ -256,8 +288,23 @@ void r1cs_add_add_constraint(const char *result, const char *left, const char *r
     snprintf(comment, sizeof(comment), "%s = %s + %s", result, left, right);
 
     r1cs_begin_constraint(result, comment);
-    r1cs_add_A(left_idx, 1);
-    r1cs_add_A(right_idx, 1);
+
+    /* Handle left operand - use constant value as coefficient if it's a constant */
+    if (left_is_const) {
+        r1cs_add_A(0, left_const_val);  /* coefficient * constant_1 */
+    } else {
+        int left_idx = r1cs_get_witness_index(left);
+        if (left_idx >= 0) r1cs_add_A(left_idx, 1);
+    }
+
+    /* Handle right operand */
+    if (right_is_const) {
+        r1cs_add_A(0, right_const_val);  /* coefficient * constant_1 */
+    } else {
+        int right_idx = r1cs_get_witness_index(right);
+        if (right_idx >= 0) r1cs_add_A(right_idx, 1);
+    }
+
     r1cs_add_B(0, 1);  /* Constant 1 */
     r1cs_add_C(result_idx, 1);
     r1cs_end_constraint();
@@ -269,11 +316,12 @@ void r1cs_add_add_constraint(const char *result, const char *left, const char *r
 }
 
 void r1cs_add_sub_constraint(const char *result, const char *left, const char *right) {
-    int left_idx = r1cs_get_witness_index(left);
-    int right_idx = r1cs_get_witness_index(right);
     int result_idx = r1cs_get_witness_index(result);
+    int left_const_val, right_const_val;
+    int left_is_const = is_constant(left, &left_const_val);
+    int right_is_const = is_constant(right, &right_const_val);
 
-    if (left_idx < 0 || right_idx < 0 || result_idx < 0) {
+    if (result_idx < 0) {
         fprintf(stderr, "Error: Invalid variable in subtraction constraint\n");
         return;
     }
@@ -282,8 +330,23 @@ void r1cs_add_sub_constraint(const char *result, const char *left, const char *r
     snprintf(comment, sizeof(comment), "%s = %s - %s", result, left, right);
 
     r1cs_begin_constraint(result, comment);
-    r1cs_add_A(left_idx, 1);
-    r1cs_add_A(right_idx, -1);
+
+    /* Handle left operand */
+    if (left_is_const) {
+        r1cs_add_A(0, left_const_val);  /* coefficient * constant_1 */
+    } else {
+        int left_idx = r1cs_get_witness_index(left);
+        if (left_idx >= 0) r1cs_add_A(left_idx, 1);
+    }
+
+    /* Handle right operand (negated for subtraction) */
+    if (right_is_const) {
+        r1cs_add_A(0, -right_const_val);  /* -coefficient * constant_1 */
+    } else {
+        int right_idx = r1cs_get_witness_index(right);
+        if (right_idx >= 0) r1cs_add_A(right_idx, -1);
+    }
+
     r1cs_add_B(0, 1);  /* Constant 1 */
     r1cs_add_C(result_idx, 1);
     r1cs_end_constraint();
@@ -552,6 +615,76 @@ void r1cs_generate_json(FILE *out, const char *circuit_name) {
     fprintf(out, "  }\n");
 
     fprintf(out, "}\n");
+}
+
+void r1cs_generate_dense(FILE *out) {
+    r1cs_build_partition();
+
+    int n_vars = r1cs.n_witnesses;
+    int n_cons = r1cs.n_constraints;
+
+    /* Print A matrix */
+    fprintf(out, "A\n");
+    for (int i = 0; i < n_cons; i++) {
+        r1cs_constraint_t *c = &r1cs.constraints[i];
+
+        /* Build dense row */
+        int *row = calloc(n_vars, sizeof(int));
+        for (int j = 0; j < c->A_count; j++) {
+            row[c->A[j].col] = c->A[j].coeff;
+        }
+
+        /* Print row */
+        fprintf(out, "[");
+        for (int j = 0; j < n_vars; j++) {
+            fprintf(out, "%d", row[j]);
+            if (j < n_vars - 1) fprintf(out, ", ");
+        }
+        fprintf(out, "]\n");
+        free(row);
+    }
+
+    /* Print B matrix */
+    fprintf(out, "B\n");
+    for (int i = 0; i < n_cons; i++) {
+        r1cs_constraint_t *c = &r1cs.constraints[i];
+
+        /* Build dense row */
+        int *row = calloc(n_vars, sizeof(int));
+        for (int j = 0; j < c->B_count; j++) {
+            row[c->B[j].col] = c->B[j].coeff;
+        }
+
+        /* Print row */
+        fprintf(out, "[");
+        for (int j = 0; j < n_vars; j++) {
+            fprintf(out, "%d", row[j]);
+            if (j < n_vars - 1) fprintf(out, ", ");
+        }
+        fprintf(out, "]\n");
+        free(row);
+    }
+
+    /* Print C matrix */
+    fprintf(out, "C\n");
+    for (int i = 0; i < n_cons; i++) {
+        r1cs_constraint_t *c = &r1cs.constraints[i];
+
+        /* Build dense row */
+        int *row = calloc(n_vars, sizeof(int));
+        for (int j = 0; j < c->C_count; j++) {
+            row[c->C[j].col] = c->C[j].coeff;
+        }
+
+        /* Print row */
+        fprintf(out, "[");
+        for (int j = 0; j < n_vars; j++) {
+            fprintf(out, "%d", row[j]);
+            if (j < n_vars - 1) fprintf(out, ", ");
+        }
+        fprintf(out, "]\n");
+        free(row);
+    }
 }
 
 void r1cs_print(void) {

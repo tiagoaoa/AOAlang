@@ -1,0 +1,21 @@
+# Vitalik's QAP example - all private inputs
+# Prove: x^3 + x + 5 = 35 (without revealing x)
+# From: https://medium.com/@VitalikButerin/quadratic-arithmetic-programs-from-zero-to-hero-f6d558cea649
+
+decl private x
+
+# Flatten x^3: sym_1 = x * x (x^2)
+sym_1 = x * x
+
+# y = sym_1 * x (x^3)
+y = sym_1 * x
+
+# Compute x^3 + x
+sym_2 = y + x
+
+# Compute x^3 + x + 5
+out = sym_2 + 5
+
+# Enforce out == 35
+thirty_five = 35
+check = out == thirty_five

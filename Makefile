@@ -129,6 +129,22 @@ test-generate: $(TARGET)
 		exit 1; \
 	fi
 
+# Test dense R1CS generation
+test-dense: $(TARGET)
+	@echo "Testing dense R1CS generation..."
+	@test_failed=0; \
+	for file in $(EXAMPLESDIR)/*.aoa; do \
+		echo "Generating dense R1CS for $$file..."; \
+		$(TARGET) -d "$$file" || test_failed=$$((test_failed + 1)); \
+		echo ""; \
+	done; \
+	if [ $$test_failed -eq 0 ]; then \
+		echo "All dense generation tests passed!"; \
+	else \
+		echo "$$test_failed test(s) failed"; \
+		exit 1; \
+	fi
+
 # Install to system (requires root)
 install: $(TARGET)
 	install -d /usr/local/bin
@@ -166,6 +182,7 @@ help:
 	@echo "  test-all      - Comprehensive test suite (valid + error tests)"
 	@echo "  test-errors   - Test error detection only"
 	@echo "  test-generate - Test R1CS JSON generation for all examples"
+	@echo "  test-dense    - Test dense R1CS generation for all examples"
 	@echo ""
 	@echo "Install Targets:"
 	@echo "  install       - Install to /usr/local/bin (requires sudo)"
@@ -174,4 +191,4 @@ help:
 	@echo "Other Targets:"
 	@echo "  help          - Show this help message"
 
-.PHONY: all test test-all test-errors test-generate install uninstall clean distclean help
+.PHONY: all test test-all test-errors test-generate test-dense install uninstall clean distclean help

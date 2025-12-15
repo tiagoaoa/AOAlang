@@ -145,6 +145,9 @@ void r1cs_generate_json(FILE *out, const char *circuit_name);
 /* Print R1CS system for debugging */
 void r1cs_print(void);
 
+/* Generate dense matrix output (.r1cs format) */
+void r1cs_generate_dense(FILE *out);
+
 /* Expression node helpers */
 expr_node_t *expr_create_var(const char *name);
 expr_node_t *expr_create_array(const char *name, int index);
