@@ -15,7 +15,11 @@ AOAlang provides a robust parser for `.aoa` files that validates both syntax and
 - Semantic analysis (variable declarations, scope checking)
 - Type checking (scalar vs array variables)
 - Index validation (arrays must be indexed, scalars cannot be indexed)
-- R1CS JSON generation with symbolic witness support (`-g` flag)
+- Multiple output formats:
+  - R1CS JSON with symbolic witness support (`-g`)
+  - Dense R1CS matrices (`-d`)
+  - QAP polynomials (`-q`)
+  - C sanity checker code (`-c`)
 - Built with Lex & Yacc for robust parsing
 - Standard POSIX-compatible build system
 
@@ -54,7 +58,31 @@ The compiled binary will be in `bin/aoac`.
 
 # Get verbose output
 ./bin/aoac -v examples/quadratic.aoa
+
+# Generate R1CS JSON output
+./bin/aoac -g examples/simple_quad.aoa
+
+# Generate dense R1CS matrix output (.r1cs)
+./bin/aoac -d examples/vitalik_qap.aoa
+
+# Generate QAP polynomial output (.qap)
+./bin/aoac -q examples/vitalik_qap.aoa
+
+# Generate C sanity checker (.c)
+./bin/aoac -c examples/vitalik_qap.aoa
 ```
+
+### Command-Line Options
+
+| Option | Long Form | Description |
+|--------|-----------|-------------|
+| `-v` | | Verbose output (show symbol table) |
+| `-g` | `--generate` | Generate R1CS JSON output (.r1cs.json) |
+| `-d` | `--dense` | Generate dense R1CS matrix output (.r1cs) |
+| `-q` | `--qap` | Generate QAP polynomial output (.qap) |
+| `-c` | `--checker` | Generate C sanity checker code (.c) |
+| `-o FILE` | | Specify output file (default: `<input>.<ext>`) |
+| `-h` | `--help` | Show help message |
 
 ## Example AOA Code
 
@@ -266,15 +294,33 @@ for file in examples/*.aoa; do
 done
 ```
 
-## R1CS Code Generation
+## Code Generation
 
-AOAlang can generate R1CS (Rank-1 Constraint System) JSON output for use with zero-knowledge proof systems. The generated JSON includes full witness partitioning, sparse constraint matrices, and symbolic expression tracking.
+AOAlang can generate multiple output formats for use with zero-knowledge proof systems.
+
+### Output Formats
+
+| Flag | Extension | Description |
+|------|-----------|-------------|
+| `-g` | `.r1cs.json` | R1CS JSON with sparse matrices and symbolic tracking |
+| `-d` | `.r1cs` | Dense R1CS matrices (human-readable text format) |
+| `-q` | `.qap` | QAP polynomials: w·A(x), w·B(x), w·C(x), P(x), H(x), Z(x) |
+| `-c` | `.c` | C sanity checker code to verify witness satisfies constraints |
 
 ### Usage
 
 ```bash
 # Generate R1CS JSON (output: <input>.r1cs.json)
 ./bin/aoac -g examples/simple_quad.aoa
+
+# Generate dense R1CS (output: <input>.r1cs)
+./bin/aoac -d examples/vitalik_qap.aoa
+
+# Generate QAP polynomials (output: <input>.qap)
+./bin/aoac -q examples/vitalik_qap.aoa
+
+# Generate C sanity checker (output: <input>.c)
+./bin/aoac -c examples/vitalik_qap.aoa
 
 # Specify custom output file
 ./bin/aoac -g -o circuit.json examples/simple_quad.aoa
