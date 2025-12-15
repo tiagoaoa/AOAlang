@@ -1,19 +1,19 @@
 # Vitalik's QAP example - all private inputs
-# Prove: x^3 + x + 5 = 35 (without revealing x)
+# Prove: u^3 + u + 5 = 35 (without revealing u)
 # From: https://medium.com/@VitalikButerin/quadratic-arithmetic-programs-from-zero-to-hero-f6d558cea649
 
-decl private x
+decl private u
 
-# Flatten x^3: sym_1 = x * x (x^2)
-sym_1 = x * x
+# Flatten u^3: sym_1 = u * u (u^2)
+sym_1 = u * u
 
-# y = sym_1 * x (x^3)
-y = sym_1 * x
+# y = sym_1 * u (u^3)
+y = sym_1 * u
 
-# Compute x^3 + x
-sym_2 = y + x
+# Compute u^3 + u
+sym_2 = y + u
 
-# Compute x^3 + x + 5
+# Compute u^3 + u + 5
 out = sym_2 + 5
 
 # Enforce out == 35

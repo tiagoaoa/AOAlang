@@ -1,16 +1,16 @@
 # Vitalik's QAP example - minimal version
-# Computes: out = x^3 + x + 5 (expecting out=35 when x=3)
+# Computes: out = u^3 + u + 5 (expecting out=35 when u=3)
 # From: https://medium.com/@VitalikButerin/quadratic-arithmetic-programs-from-zero-to-hero-f6d558cea649
 #
 # Flattening produces exactly 4 constraints:
-#   1. sym_1 = x * x      (x^2)
-#   2. y = sym_1 * x      (x^3)
-#   3. sym_2 = y + x      (x^3 + x)
-#   4. out = sym_2 + 5    (x^3 + x + 5)
+#   1. sym_1 = u * u      (u^2)
+#   2. y = sym_1 * u      (u^3)
+#   3. sym_2 = y + u      (u^3 + u)
+#   4. out = sym_2 + 5    (u^3 + u + 5)
 
-decl private x
+decl private u
 
-sym_1 = x * x
-y = sym_1 * x
-sym_2 = y + x
+sym_1 = u * u
+y = sym_1 * u
+sym_2 = y + u
 out = sym_2 + 5

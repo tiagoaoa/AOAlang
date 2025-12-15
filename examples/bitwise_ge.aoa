@@ -1,10 +1,10 @@
-# Bitwise Greater-Equal: x >= t (8-bit unsigned comparison)
+# Bitwise Greater-Equal: u >= t (8-bit unsigned comparison)
 #
-# Private:  x[8] - 8-bit secret value
+# Private:  u[8] - 8-bit secret value
 # Deferred: t[8] - 8-bit symbolic threshold
 #
-# Proves x >= t by computing subtraction with borrow chain.
-# Only asserts: borrow[7] == 0 (no underflow means x >= t)
+# Proves u >= t by computing subtraction with borrow chain.
+# Only asserts: borrow[7] == 0 (no underflow means u >= t)
 #
 # Bitwise ops in R1CS:
 #   XOR(a,b) = a + b - 2*a*b
@@ -12,37 +12,37 @@
 #   NOT(a)   = 1 - a
 #   OR(a,b)  = a + b - a*b
 
-decl private x[8]
+decl private u[8]
 decl deferred t[8]
 
 # ============ BOOLEAN CONSTRAINTS (inputs only) ============
-x0_sq = x[0] * x[0]
-x0_bit = x0_sq - x[0]
-x1_sq = x[1] * x[1]
-x1_bit = x1_sq - x[1]
-x2_sq = x[2] * x[2]
-x2_bit = x2_sq - x[2]
-x3_sq = x[3] * x[3]
-x3_bit = x3_sq - x[3]
-x4_sq = x[4] * x[4]
-x4_bit = x4_sq - x[4]
-x5_sq = x[5] * x[5]
-x5_bit = x5_sq - x[5]
-x6_sq = x[6] * x[6]
-x6_bit = x6_sq - x[6]
-x7_sq = x[7] * x[7]
-x7_bit = x7_sq - x[7]
+u0_sq = u[0] * u[0]
+u0_bit = u0_sq - u[0]
+u1_sq = u[1] * u[1]
+u1_bit = u1_sq - u[1]
+u2_sq = u[2] * u[2]
+u2_bit = u2_sq - u[2]
+u3_sq = u[3] * u[3]
+u3_bit = u3_sq - u[3]
+u4_sq = u[4] * u[4]
+u4_bit = u4_sq - u[4]
+u5_sq = u[5] * u[5]
+u5_bit = u5_sq - u[5]
+u6_sq = u[6] * u[6]
+u6_bit = u6_sq - u[6]
+u7_sq = u[7] * u[7]
+u7_bit = u7_sq - u[7]
 
 # ============ BIT 0: HALF SUBTRACTOR ============
-# borrow[0] = !x[0] & t[0] = (1 - x[0]) * t[0]
-not_x0 = 1 - x[0]
-bw0 = not_x0 * t[0]
+# borrow[0] = !u[0] & t[0] = (1 - u[0]) * t[0]
+not_u0 = 1 - u[0]
+bw0 = not_u0 * t[0]
 
 # ============ BIT 1: FULL SUBTRACTOR ============
-# borrow[1] = (!x[1] & t[1]) | (!x[1] & bw0) | (t[1] & bw0)
-not_x1 = 1 - x[1]
-and1_a = not_x1 * t[1]
-and1_b = not_x1 * bw0
+# borrow[1] = (!u[1] & t[1]) | (!u[1] & bw0) | (t[1] & bw0)
+not_u1 = 1 - u[1]
+and1_a = not_u1 * t[1]
+and1_b = not_u1 * bw0
 and1_c = t[1] * bw0
 or1_ab = and1_a + and1_b
 and1_ab = and1_a * and1_b
@@ -52,9 +52,9 @@ and1_abc = or1_ab_v * and1_c
 bw1 = or1_abc - and1_abc
 
 # ============ BIT 2: FULL SUBTRACTOR ============
-not_x2 = 1 - x[2]
-and2_a = not_x2 * t[2]
-and2_b = not_x2 * bw1
+not_u2 = 1 - u[2]
+and2_a = not_u2 * t[2]
+and2_b = not_u2 * bw1
 and2_c = t[2] * bw1
 or2_ab = and2_a + and2_b
 and2_ab = and2_a * and2_b
@@ -64,9 +64,9 @@ and2_abc = or2_ab_v * and2_c
 bw2 = or2_abc - and2_abc
 
 # ============ BIT 3: FULL SUBTRACTOR ============
-not_x3 = 1 - x[3]
-and3_a = not_x3 * t[3]
-and3_b = not_x3 * bw2
+not_u3 = 1 - u[3]
+and3_a = not_u3 * t[3]
+and3_b = not_u3 * bw2
 and3_c = t[3] * bw2
 or3_ab = and3_a + and3_b
 and3_ab = and3_a * and3_b
@@ -76,9 +76,9 @@ and3_abc = or3_ab_v * and3_c
 bw3 = or3_abc - and3_abc
 
 # ============ BIT 4: FULL SUBTRACTOR ============
-not_x4 = 1 - x[4]
-and4_a = not_x4 * t[4]
-and4_b = not_x4 * bw3
+not_u4 = 1 - u[4]
+and4_a = not_u4 * t[4]
+and4_b = not_u4 * bw3
 and4_c = t[4] * bw3
 or4_ab = and4_a + and4_b
 and4_ab = and4_a * and4_b
@@ -88,9 +88,9 @@ and4_abc = or4_ab_v * and4_c
 bw4 = or4_abc - and4_abc
 
 # ============ BIT 5: FULL SUBTRACTOR ============
-not_x5 = 1 - x[5]
-and5_a = not_x5 * t[5]
-and5_b = not_x5 * bw4
+not_u5 = 1 - u[5]
+and5_a = not_u5 * t[5]
+and5_b = not_u5 * bw4
 and5_c = t[5] * bw4
 or5_ab = and5_a + and5_b
 and5_ab = and5_a * and5_b
@@ -100,9 +100,9 @@ and5_abc = or5_ab_v * and5_c
 bw5 = or5_abc - and5_abc
 
 # ============ BIT 6: FULL SUBTRACTOR ============
-not_x6 = 1 - x[6]
-and6_a = not_x6 * t[6]
-and6_b = not_x6 * bw5
+not_u6 = 1 - u[6]
+and6_a = not_u6 * t[6]
+and6_b = not_u6 * bw5
 and6_c = t[6] * bw5
 or6_ab = and6_a + and6_b
 and6_ab = and6_a * and6_b
@@ -112,9 +112,9 @@ and6_abc = or6_ab_v * and6_c
 bw6 = or6_abc - and6_abc
 
 # ============ BIT 7: FULL SUBTRACTOR (MSB) ============
-not_x7 = 1 - x[7]
-and7_a = not_x7 * t[7]
-and7_b = not_x7 * bw6
+not_u7 = 1 - u[7]
+and7_a = not_u7 * t[7]
+and7_b = not_u7 * bw6
 and7_c = t[7] * bw6
 or7_ab = and7_a + and7_b
 and7_ab = and7_a * and7_b
@@ -124,6 +124,6 @@ and7_abc = or7_ab_v * and7_c
 bw7 = or7_abc - and7_abc
 
 # ============ SINGLE ASSERTION: SIGN BIT ============
-# bw7 = 0 means no underflow, i.e., x >= t
+# bw7 = 0 means no underflow, i.e., u >= t
 zero = 0
 sign_check = bw7 == zero
