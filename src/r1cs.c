@@ -752,21 +752,67 @@ static void lagrange_interpolate(int n, int *y, double *coeffs) {
     }
 }
 
+/* Helper to format a coefficient value, rounding near-integers */
+static void format_coeff(char *buf, size_t bufsize, double val) {
+    double rounded = (val >= 0) ? (int)(val + 0.5) : (int)(val - 0.5);
+    if (fabs(val - rounded) < 1e-9) {
+        snprintf(buf, bufsize, "%.0f", rounded);
+    } else {
+        snprintf(buf, bufsize, "%.6g", val);
+    }
+}
+
 /* Helper to print polynomial coefficients, rounding near-integers */
 static void print_poly_coeffs(FILE *out, double *coeffs, int n) {
+    char buf[64];
+
+    /* Print coefficient array */
     fprintf(out, "[");
     for (int i = 0; i < n; i++) {
-        /* Round to nearest integer if very close */
-        double val = coeffs[i];
-        double rounded = (val >= 0) ? (int)(val + 0.5) : (int)(val - 0.5);
-        if (fabs(val - rounded) < 1e-9) {
-            fprintf(out, "%.0f", rounded);
-        } else {
-            fprintf(out, "%.6g", val);
-        }
+        format_coeff(buf, sizeof(buf), coeffs[i]);
+        fprintf(out, "%s", buf);
         if (i < n - 1) fprintf(out, ", ");
     }
     fprintf(out, "]");
+
+    /* Print polynomial expression */
+    fprintf(out, "  =  ");
+    int first = 1;
+    for (int i = n - 1; i >= 0; i--) {
+        double val = coeffs[i];
+        double rounded = (val >= 0) ? (int)(val + 0.5) : (int)(val - 0.5);
+        if (fabs(val - rounded) < 1e-9) val = rounded;
+
+        if (fabs(val) < 1e-9) continue;  /* Skip zero terms */
+
+        /* Print sign and coefficient */
+        if (first) {
+            format_coeff(buf, sizeof(buf), val);
+            fprintf(out, "%s", buf);
+            first = 0;
+        } else {
+            if (val >= 0) {
+                format_coeff(buf, sizeof(buf), val);
+                fprintf(out, " + %s", buf);
+            } else {
+                format_coeff(buf, sizeof(buf), -val);
+                fprintf(out, " - %s", buf);
+            }
+        }
+
+        /* Print x^power */
+        if (i > 1) {
+            fprintf(out, "*x^%d", i);
+        } else if (i == 1) {
+            fprintf(out, "*x");
+        }
+        /* i == 0: constant term, no x */
+    }
+
+    /* Handle zero polynomial */
+    if (first) {
+        fprintf(out, "0");
+    }
 }
 
 void r1cs_generate_qap(FILE *out) {
