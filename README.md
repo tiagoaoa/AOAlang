@@ -63,13 +63,13 @@ The compiled binary will be in `bin/aoac`.
 ./bin/aoac -g examples/simple_quad.aoa
 
 # Generate dense R1CS matrix output (.r1cs)
-./bin/aoac -d examples/vitalik_qap.aoa
+./bin/aoac -d examples/vitalik_deferred.aoa
 
 # Generate QAP polynomial output (.qap)
-./bin/aoac -q examples/vitalik_qap.aoa
+./bin/aoac -q examples/vitalik_deferred.aoa
 
 # Generate C sanity checker (.c)
-./bin/aoac -c examples/vitalik_qap.aoa
+./bin/aoac -c examples/vitalik_deferred.aoa
 ```
 
 ### Command-Line Options
@@ -314,13 +314,13 @@ AOAlang can generate multiple output formats for use with zero-knowledge proof s
 ./bin/aoac -g examples/simple_quad.aoa
 
 # Generate dense R1CS (output: <input>.r1cs)
-./bin/aoac -d examples/vitalik_qap.aoa
+./bin/aoac -d examples/vitalik_deferred.aoa
 
 # Generate QAP polynomials (output: <input>.qap)
-./bin/aoac -q examples/vitalik_qap.aoa
+./bin/aoac -q examples/vitalik_deferred.aoa
 
 # Generate C sanity checker (output: <input>.c)
-./bin/aoac -c examples/vitalik_qap.aoa
+./bin/aoac -c examples/vitalik_deferred.aoa
 
 # Specify custom output file
 ./bin/aoac -g -o circuit.json examples/simple_quad.aoa
@@ -492,7 +492,7 @@ The `symbolic_propagation` section tracks how each gate variable is computed sym
 
 Based on [Vitalik Buterin's QAP tutorial](https://medium.com/@VitalikButerin/quadratic-arithmetic-programs-from-zero-to-hero-f6d558cea649), we modify `x³ + x + 5 = 35` to use a symbolic (deferred) input `k` instead of the constant `5`.
 
-**Input (`vitalik_qap.aoa`):**
+**Input (`vitalik_deferred.aoa`):**
 ```aoa
 decl private x
 decl deferred k
