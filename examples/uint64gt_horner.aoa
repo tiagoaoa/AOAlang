@@ -1,0 +1,488 @@
+# 64-bit unsigned integer greater-than-or-equal comparison using range proof
+# Proves: actual >= minOut (i.e., actual - minOut fits in 64 bits)
+#
+# AMM use case:
+# - actual: public on-chain execution result (e.g., swap output amount)
+# - minOut: prover's private minimum acceptable value (secret slippage tolerance)
+#
+# Approach: Instead of borrow-tracking subtraction, prove that diff = actual - minOut
+# can be decomposed into 64 bits (meaning diff >= 0 in unsigned interpretation).
+#
+# If actual < minOut, the field subtraction wraps to a huge number (~2^254)
+# which cannot be represented in 64 bits, causing the proof to fail.
+#
+# Constraints: ~129 (vs ~317 for borrow-tracking approach)
+# - 1: diff computation
+# - 64: Horner reconstruction (doubling + addition)
+# - 64: binary checks (d[i] * d[i] = d[i])
+
+decl deferred actual
+decl private d[64]
+decl private minOut
+
+# Compute difference (field subtraction)
+diff = actual - minOut
+
+# Horner reconstruction: r = d[63]*2^63 + d[62]*2^62 + ... + d[0]
+# Evaluated as: (((...((d[63])*2 + d[62])*2 + d[61])*2 + ...)*2 + d[0])
+# Each iteration: r_i = 2 * r_{i+1} + d[i] = r_{i+1} + r_{i+1} + d[i]
+
+r63 = d[63]
+
+r62_dbl = r63 + r63
+r62 = r62_dbl + d[62]
+
+r61_dbl = r62 + r62
+r61 = r61_dbl + d[61]
+
+r60_dbl = r61 + r61
+r60 = r60_dbl + d[60]
+
+r59_dbl = r60 + r60
+r59 = r59_dbl + d[59]
+
+r58_dbl = r59 + r59
+r58 = r58_dbl + d[58]
+
+r57_dbl = r58 + r58
+r57 = r57_dbl + d[57]
+
+r56_dbl = r57 + r57
+r56 = r56_dbl + d[56]
+
+r55_dbl = r56 + r56
+r55 = r55_dbl + d[55]
+
+r54_dbl = r55 + r55
+r54 = r54_dbl + d[54]
+
+r53_dbl = r54 + r54
+r53 = r53_dbl + d[53]
+
+r52_dbl = r53 + r53
+r52 = r52_dbl + d[52]
+
+r51_dbl = r52 + r52
+r51 = r51_dbl + d[51]
+
+r50_dbl = r51 + r51
+r50 = r50_dbl + d[50]
+
+r49_dbl = r50 + r50
+r49 = r49_dbl + d[49]
+
+r48_dbl = r49 + r49
+r48 = r48_dbl + d[48]
+
+r47_dbl = r48 + r48
+r47 = r47_dbl + d[47]
+
+r46_dbl = r47 + r47
+r46 = r46_dbl + d[46]
+
+r45_dbl = r46 + r46
+r45 = r45_dbl + d[45]
+
+r44_dbl = r45 + r45
+r44 = r44_dbl + d[44]
+
+r43_dbl = r44 + r44
+r43 = r43_dbl + d[43]
+
+r42_dbl = r43 + r43
+r42 = r42_dbl + d[42]
+
+r41_dbl = r42 + r42
+r41 = r41_dbl + d[41]
+
+r40_dbl = r41 + r41
+r40 = r40_dbl + d[40]
+
+r39_dbl = r40 + r40
+r39 = r39_dbl + d[39]
+
+r38_dbl = r39 + r39
+r38 = r38_dbl + d[38]
+
+r37_dbl = r38 + r38
+r37 = r37_dbl + d[37]
+
+r36_dbl = r37 + r37
+r36 = r36_dbl + d[36]
+
+r35_dbl = r36 + r36
+r35 = r35_dbl + d[35]
+
+r34_dbl = r35 + r35
+r34 = r34_dbl + d[34]
+
+r33_dbl = r34 + r34
+r33 = r33_dbl + d[33]
+
+r32_dbl = r33 + r33
+r32 = r32_dbl + d[32]
+
+r31_dbl = r32 + r32
+r31 = r31_dbl + d[31]
+
+r30_dbl = r31 + r31
+r30 = r30_dbl + d[30]
+
+r29_dbl = r30 + r30
+r29 = r29_dbl + d[29]
+
+r28_dbl = r29 + r29
+r28 = r28_dbl + d[28]
+
+r27_dbl = r28 + r28
+r27 = r27_dbl + d[27]
+
+r26_dbl = r27 + r27
+r26 = r26_dbl + d[26]
+
+r25_dbl = r26 + r26
+r25 = r25_dbl + d[25]
+
+r24_dbl = r25 + r25
+r24 = r24_dbl + d[24]
+
+r23_dbl = r24 + r24
+r23 = r23_dbl + d[23]
+
+r22_dbl = r23 + r23
+r22 = r22_dbl + d[22]
+
+r21_dbl = r22 + r22
+r21 = r21_dbl + d[21]
+
+r20_dbl = r21 + r21
+r20 = r20_dbl + d[20]
+
+r19_dbl = r20 + r20
+r19 = r19_dbl + d[19]
+
+r18_dbl = r19 + r19
+r18 = r18_dbl + d[18]
+
+r17_dbl = r18 + r18
+r17 = r17_dbl + d[17]
+
+r16_dbl = r17 + r17
+r16 = r16_dbl + d[16]
+
+r15_dbl = r16 + r16
+r15 = r15_dbl + d[15]
+
+r14_dbl = r15 + r15
+r14 = r14_dbl + d[14]
+
+r13_dbl = r14 + r14
+r13 = r13_dbl + d[13]
+
+r12_dbl = r13 + r13
+r12 = r12_dbl + d[12]
+
+r11_dbl = r12 + r12
+r11 = r11_dbl + d[11]
+
+r10_dbl = r11 + r11
+r10 = r10_dbl + d[10]
+
+r9_dbl = r10 + r10
+r9 = r9_dbl + d[9]
+
+r8_dbl = r9 + r9
+r8 = r8_dbl + d[8]
+
+r7_dbl = r8 + r8
+r7 = r7_dbl + d[7]
+
+r6_dbl = r7 + r7
+r6 = r6_dbl + d[6]
+
+r5_dbl = r6 + r6
+r5 = r5_dbl + d[5]
+
+r4_dbl = r5 + r5
+r4 = r4_dbl + d[4]
+
+r3_dbl = r4 + r4
+r3 = r3_dbl + d[3]
+
+r2_dbl = r3 + r3
+r2 = r2_dbl + d[2]
+
+r1_dbl = r2 + r2
+r1 = r1_dbl + d[1]
+
+r0_dbl = r1 + r1
+reconstructed = r0_dbl + d[0]
+
+# Verify reconstruction equals diff
+check_val = reconstructed - diff
+zero = 0
+verify_recon = check_val == zero
+
+# Binary checks: d[i] * (d[i] - 1) = 0 for all i
+# Each bit requires 3 constraints:
+#   1. d_m = d[i] - 1
+#   2. c = d[i] * d_m
+#   3. v = c == zero
+one = 1
+
+d63m = d[63] - one
+c63 = d[63] * d63m
+v63 = c63 == zero
+
+d62m = d[62] - one
+c62 = d[62] * d62m
+v62 = c62 == zero
+
+d61m = d[61] - one
+c61 = d[61] * d61m
+v61 = c61 == zero
+
+d60m = d[60] - one
+c60 = d[60] * d60m
+v60 = c60 == zero
+
+d59m = d[59] - one
+c59 = d[59] * d59m
+v59 = c59 == zero
+
+d58m = d[58] - one
+c58 = d[58] * d58m
+v58 = c58 == zero
+
+d57m = d[57] - one
+c57 = d[57] * d57m
+v57 = c57 == zero
+
+d56m = d[56] - one
+c56 = d[56] * d56m
+v56 = c56 == zero
+
+d55m = d[55] - one
+c55 = d[55] * d55m
+v55 = c55 == zero
+
+d54m = d[54] - one
+c54 = d[54] * d54m
+v54 = c54 == zero
+
+d53m = d[53] - one
+c53 = d[53] * d53m
+v53 = c53 == zero
+
+d52m = d[52] - one
+c52 = d[52] * d52m
+v52 = c52 == zero
+
+d51m = d[51] - one
+c51 = d[51] * d51m
+v51 = c51 == zero
+
+d50m = d[50] - one
+c50 = d[50] * d50m
+v50 = c50 == zero
+
+d49m = d[49] - one
+c49 = d[49] * d49m
+v49 = c49 == zero
+
+d48m = d[48] - one
+c48 = d[48] * d48m
+v48 = c48 == zero
+
+d47m = d[47] - one
+c47 = d[47] * d47m
+v47 = c47 == zero
+
+d46m = d[46] - one
+c46 = d[46] * d46m
+v46 = c46 == zero
+
+d45m = d[45] - one
+c45 = d[45] * d45m
+v45 = c45 == zero
+
+d44m = d[44] - one
+c44 = d[44] * d44m
+v44 = c44 == zero
+
+d43m = d[43] - one
+c43 = d[43] * d43m
+v43 = c43 == zero
+
+d42m = d[42] - one
+c42 = d[42] * d42m
+v42 = c42 == zero
+
+d41m = d[41] - one
+c41 = d[41] * d41m
+v41 = c41 == zero
+
+d40m = d[40] - one
+c40 = d[40] * d40m
+v40 = c40 == zero
+
+d39m = d[39] - one
+c39 = d[39] * d39m
+v39 = c39 == zero
+
+d38m = d[38] - one
+c38 = d[38] * d38m
+v38 = c38 == zero
+
+d37m = d[37] - one
+c37 = d[37] * d37m
+v37 = c37 == zero
+
+d36m = d[36] - one
+c36 = d[36] * d36m
+v36 = c36 == zero
+
+d35m = d[35] - one
+c35 = d[35] * d35m
+v35 = c35 == zero
+
+d34m = d[34] - one
+c34 = d[34] * d34m
+v34 = c34 == zero
+
+d33m = d[33] - one
+c33 = d[33] * d33m
+v33 = c33 == zero
+
+d32m = d[32] - one
+c32 = d[32] * d32m
+v32 = c32 == zero
+
+d31m = d[31] - one
+c31 = d[31] * d31m
+v31 = c31 == zero
+
+d30m = d[30] - one
+c30 = d[30] * d30m
+v30 = c30 == zero
+
+d29m = d[29] - one
+c29 = d[29] * d29m
+v29 = c29 == zero
+
+d28m = d[28] - one
+c28 = d[28] * d28m
+v28 = c28 == zero
+
+d27m = d[27] - one
+c27 = d[27] * d27m
+v27 = c27 == zero
+
+d26m = d[26] - one
+c26 = d[26] * d26m
+v26 = c26 == zero
+
+d25m = d[25] - one
+c25 = d[25] * d25m
+v25 = c25 == zero
+
+d24m = d[24] - one
+c24 = d[24] * d24m
+v24 = c24 == zero
+
+d23m = d[23] - one
+c23 = d[23] * d23m
+v23 = c23 == zero
+
+d22m = d[22] - one
+c22 = d[22] * d22m
+v22 = c22 == zero
+
+d21m = d[21] - one
+c21 = d[21] * d21m
+v21 = c21 == zero
+
+d20m = d[20] - one
+c20 = d[20] * d20m
+v20 = c20 == zero
+
+d19m = d[19] - one
+c19 = d[19] * d19m
+v19 = c19 == zero
+
+d18m = d[18] - one
+c18 = d[18] * d18m
+v18 = c18 == zero
+
+d17m = d[17] - one
+c17 = d[17] * d17m
+v17 = c17 == zero
+
+d16m = d[16] - one
+c16 = d[16] * d16m
+v16 = c16 == zero
+
+d15m = d[15] - one
+c15 = d[15] * d15m
+v15 = c15 == zero
+
+d14m = d[14] - one
+c14 = d[14] * d14m
+v14 = c14 == zero
+
+d13m = d[13] - one
+c13 = d[13] * d13m
+v13 = c13 == zero
+
+d12m = d[12] - one
+c12 = d[12] * d12m
+v12 = c12 == zero
+
+d11m = d[11] - one
+c11 = d[11] * d11m
+v11 = c11 == zero
+
+d10m = d[10] - one
+c10 = d[10] * d10m
+v10 = c10 == zero
+
+d9m = d[9] - one
+c9 = d[9] * d9m
+v9 = c9 == zero
+
+d8m = d[8] - one
+c8 = d[8] * d8m
+v8 = c8 == zero
+
+d7m = d[7] - one
+c7 = d[7] * d7m
+v7 = c7 == zero
+
+d6m = d[6] - one
+c6 = d[6] * d6m
+v6 = c6 == zero
+
+d5m = d[5] - one
+c5 = d[5] * d5m
+v5 = c5 == zero
+
+d4m = d[4] - one
+c4 = d[4] * d4m
+v4 = c4 == zero
+
+d3m = d[3] - one
+c3 = d[3] * d3m
+v3 = c3 == zero
+
+d2m = d[2] - one
+c2 = d[2] * d2m
+v2 = c2 == zero
+
+d1m = d[1] - one
+c1 = d[1] * d1m
+v1 = c1 == zero
+
+d0m = d[0] - one
+c0 = d[0] * d0m
+v0 = c0 == zero
+
