@@ -90,26 +90,18 @@ The compiled binary will be in `bin/aoac`.
 
 ```aoa
 # Prove x^2 + a*x + b = 0
-decl private x[1]
-decl deferred a[2], b[2]
-
-# Compute a_val = a[0] + 2*a[1]
-two_a1 = a[1] + a[1]
-a_val = a[0] + two_a1
-
-# Compute b_val = b[0] + 2*b[1]
-two_b1 = b[1] + b[1]
-b_val = b[0] + two_b1
+decl private x
+decl deferred a, b
 
 # Compute x^2
-x_squared = x[0] * x[0]
+x_squared = x * x
 
 # Compute a*x
-ax = a_val * x[0]
+ax = a * x
 
 # Compute x^2 + a*x + b
 sum1 = x_squared + ax
-poly_result = sum1 + b_val
+poly_result = sum1 + b
 
 # Enforce poly_result == 0
 zero_const = 0
@@ -357,17 +349,13 @@ For the circuit that proves `x² + a·x + b = 0`:
 
 **Input (`simple_quad.aoa`):**
 ```aoa
-decl private x[1]
-decl deferred a[2], b[2]
+decl private x
+decl deferred a, b
 
-two_a1 = a[1] + a[1]
-a_val = a[0] + two_a1
-two_b1 = b[1] + b[1]
-b_val = b[0] + two_b1
-x_squared = x[0] * x[0]
-ax = a_val * x[0]
+x_squared = x * x
+ax = a * x
 sum1 = x_squared + ax
-poly_result = sum1 + b_val
+poly_result = sum1 + b
 zero_const = 0
 check = poly_result == zero_const
 ```
@@ -380,90 +368,67 @@ check = poly_result == zero_const
   "field": "bn254",
 
   "witness": {
-    "total": 16,
+    "total": 10,
     "partition": {
       "constant": {"indices": [0], "names": ["1"]},
-      "private": {"indices": [1], "names": ["x[0]"]},
-      "deferred": {"indices": [2, 3, 4, 5], "names": ["a[0]", "a[1]", "b[0]", "b[1]"]},
-      "gates": {"indices": [6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
-               "names": ["two_a1", "a_val", "two_b1", "b_val", "x_squared",
-                        "ax", "sum1", "poly_result", "zero_const", "check"]}
+      "private": {"indices": [1], "names": ["x"]},
+      "deferred": {"indices": [2, 3], "names": ["a", "b"]},
+      "gates": {"indices": [4, 5, 6, 7, 8, 9],
+               "names": ["x_squared", "ax", "sum1", "poly_result", "zero_const", "check"]}
     },
     "entries": [
       {"index": 0, "name": "1", "visibility": "public", "origin": "declared", "symbolic": "1"},
-      {"index": 1, "name": "x[0]", "visibility": "private", "origin": "declared", "symbolic": "x[0]"},
-      {"index": 2, "name": "a[0]", "visibility": "deferred", "origin": "declared", "symbolic": "a[0]"},
-      {"index": 3, "name": "a[1]", "visibility": "deferred", "origin": "declared", "symbolic": "a[1]"},
-      {"index": 4, "name": "b[0]", "visibility": "deferred", "origin": "declared", "symbolic": "b[0]"},
-      {"index": 5, "name": "b[1]", "visibility": "deferred", "origin": "declared", "symbolic": "b[1]"},
-      {"index": 6, "name": "two_a1", "visibility": "private", "origin": "gate", "symbolic": "a[1] + a[1]"},
-      {"index": 7, "name": "a_val", "visibility": "private", "origin": "gate", "symbolic": "a[0] + two_a1"},
-      {"index": 8, "name": "two_b1", "visibility": "private", "origin": "gate", "symbolic": "b[1] + b[1]"},
-      {"index": 9, "name": "b_val", "visibility": "private", "origin": "gate", "symbolic": "b[0] + two_b1"},
-      {"index": 10, "name": "x_squared", "visibility": "private", "origin": "gate", "symbolic": "x[0] * x[0]"},
-      {"index": 11, "name": "ax", "visibility": "private", "origin": "gate", "symbolic": "a_val * x[0]"},
-      {"index": 12, "name": "sum1", "visibility": "private", "origin": "gate", "symbolic": "x_squared + ax"},
-      {"index": 13, "name": "poly_result", "visibility": "private", "origin": "gate", "symbolic": "sum1 + b_val"},
-      {"index": 14, "name": "zero_const", "visibility": "private", "origin": "gate", "symbolic": "0"},
-      {"index": 15, "name": "check", "visibility": "private", "origin": "gate", "symbolic": "0"}
+      {"index": 1, "name": "x", "visibility": "private", "origin": "declared", "symbolic": "x"},
+      {"index": 2, "name": "a", "visibility": "deferred", "origin": "declared", "symbolic": "a"},
+      {"index": 3, "name": "b", "visibility": "deferred", "origin": "declared", "symbolic": "b"},
+      {"index": 4, "name": "x_squared", "visibility": "private", "origin": "gate", "symbolic": "x * x"},
+      {"index": 5, "name": "ax", "visibility": "private", "origin": "gate", "symbolic": "a * x"},
+      {"index": 6, "name": "sum1", "visibility": "private", "origin": "gate", "symbolic": "x_squared + ax"},
+      {"index": 7, "name": "poly_result", "visibility": "private", "origin": "gate", "symbolic": "sum1 + b"},
+      {"index": 8, "name": "zero_const", "visibility": "private", "origin": "gate", "symbolic": "0"},
+      {"index": 9, "name": "check", "visibility": "private", "origin": "gate", "symbolic": "0"}
     ]
   },
 
   "r1cs": {
-    "n_constraints": 10,
-    "n_variables": 16,
+    "n_constraints": 6,
+    "n_variables": 10,
 
     "A": [
-      {"row": 0, "entries": [{"col": 3, "val": 1}, {"col": 3, "val": 1}], "comment": "two_a1 = a[1] + a[1]"},
-      {"row": 1, "entries": [{"col": 2, "val": 1}, {"col": 6, "val": 1}], "comment": "a_val = a[0] + two_a1"},
-      {"row": 2, "entries": [{"col": 5, "val": 1}, {"col": 5, "val": 1}], "comment": "two_b1 = b[1] + b[1]"},
-      {"row": 3, "entries": [{"col": 4, "val": 1}, {"col": 8, "val": 1}], "comment": "b_val = b[0] + two_b1"},
-      {"row": 4, "entries": [{"col": 1, "val": 1}], "comment": "x_squared = x[0] * x[0]"},
-      {"row": 5, "entries": [{"col": 7, "val": 1}], "comment": "ax = a_val * x[0]"},
-      {"row": 6, "entries": [{"col": 10, "val": 1}, {"col": 11, "val": 1}], "comment": "sum1 = x_squared + ax"},
-      {"row": 7, "entries": [{"col": 12, "val": 1}, {"col": 9, "val": 1}], "comment": "poly_result = sum1 + b_val"},
-      {"row": 8, "entries": [{"col": 14, "val": 1}, {"col": 0, "val": 0}], "comment": "zero_const = 0"},
-      {"row": 9, "entries": [{"col": 13, "val": 1}, {"col": 14, "val": -1}], "comment": "check: poly_result == zero_const"}
+      {"row": 0, "entries": [{"col": 1, "val": 1}], "comment": "x_squared = x * x"},
+      {"row": 1, "entries": [{"col": 2, "val": 1}], "comment": "ax = a * x"},
+      {"row": 2, "entries": [{"col": 4, "val": 1}, {"col": 5, "val": 1}], "comment": "sum1 = x_squared + ax"},
+      {"row": 3, "entries": [{"col": 6, "val": 1}, {"col": 3, "val": 1}], "comment": "poly_result = sum1 + b"},
+      {"row": 4, "entries": [{"col": 8, "val": 1}, {"col": 0, "val": 0}], "comment": "zero_const = 0"},
+      {"row": 5, "entries": [{"col": 7, "val": 1}, {"col": 8, "val": -1}], "comment": "check: poly_result == zero_const"}
     ],
 
     "B": [
-      {"row": 0, "entries": [{"col": 0, "val": 1}]},
-      {"row": 1, "entries": [{"col": 0, "val": 1}]},
+      {"row": 0, "entries": [{"col": 1, "val": 1}]},
+      {"row": 1, "entries": [{"col": 1, "val": 1}]},
       {"row": 2, "entries": [{"col": 0, "val": 1}]},
       {"row": 3, "entries": [{"col": 0, "val": 1}]},
-      {"row": 4, "entries": [{"col": 1, "val": 1}]},
-      {"row": 5, "entries": [{"col": 1, "val": 1}]},
-      {"row": 6, "entries": [{"col": 0, "val": 1}]},
-      {"row": 7, "entries": [{"col": 0, "val": 1}]},
-      {"row": 8, "entries": [{"col": 0, "val": 1}]},
-      {"row": 9, "entries": [{"col": 0, "val": 1}]}
+      {"row": 4, "entries": [{"col": 0, "val": 1}]},
+      {"row": 5, "entries": [{"col": 0, "val": 1}]}
     ],
 
     "C": [
-      {"row": 0, "entries": [{"col": 6, "val": 1}]},
-      {"row": 1, "entries": [{"col": 7, "val": 1}]},
-      {"row": 2, "entries": [{"col": 8, "val": 1}]},
-      {"row": 3, "entries": [{"col": 9, "val": 1}]},
-      {"row": 4, "entries": [{"col": 10, "val": 1}]},
-      {"row": 5, "entries": [{"col": 11, "val": 1}]},
-      {"row": 6, "entries": [{"col": 12, "val": 1}]},
-      {"row": 7, "entries": [{"col": 13, "val": 1}]},
-      {"row": 8, "entries": []},
-      {"row": 9, "entries": []}
+      {"row": 0, "entries": [{"col": 4, "val": 1}]},
+      {"row": 1, "entries": [{"col": 5, "val": 1}]},
+      {"row": 2, "entries": [{"col": 6, "val": 1}]},
+      {"row": 3, "entries": [{"col": 7, "val": 1}]},
+      {"row": 4, "entries": []},
+      {"row": 5, "entries": []}
     ]
   },
 
-  "public_inputs": ["1", "a[0]", "a[1]", "b[0]", "b[1]"],
+  "public_inputs": ["1", "a", "b"],
 
   "symbolic_propagation": {
-    "two_a1": "a[1] + a[1]",
-    "a_val": "a[0] + two_a1",
-    "two_b1": "b[1] + b[1]",
-    "b_val": "b[0] + two_b1",
-    "x_squared": "x[0] * x[0]",
-    "ax": "a_val * x[0]",
+    "x_squared": "x * x",
+    "ax": "a * x",
     "sum1": "x_squared + ax",
-    "poly_result": "sum1 + b_val",
+    "poly_result": "sum1 + b",
     "zero_const": "0",
     "check": "0"
   }
@@ -474,12 +439,12 @@ check = poly_result == zero_const
 
 Each R1CS constraint has the form: **A · B = C** (element-wise dot products with witness vector)
 
-For example, constraint row 4 (`x_squared = x[0] * x[0]`):
-- **A[4]**: `[{col: 1, val: 1}]` → selects `w[1]` (which is `x[0]`)
-- **B[4]**: `[{col: 1, val: 1}]` → selects `w[1]` (which is `x[0]`)
-- **C[4]**: `[{col: 10, val: 1}]` → selects `w[10]` (which is `x_squared`)
+For example, constraint row 0 (`x_squared = x * x`):
+- **A[0]**: `[{col: 1, val: 1}]` → selects `w[1]` (which is `x`)
+- **B[0]**: `[{col: 1, val: 1}]` → selects `w[1]` (which is `x`)
+- **C[0]**: `[{col: 4, val: 1}]` → selects `w[4]` (which is `x_squared`)
 
-This encodes: `x[0] * x[0] = x_squared`
+This encodes: `x * x = x_squared`
 
 ### Symbolic Expressions
 
