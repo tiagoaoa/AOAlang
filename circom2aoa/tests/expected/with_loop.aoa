@@ -1,0 +1,23 @@
+decl private in
+decl deferred out[4]
+
+t0 = out[0] - 1
+t1 = out[0] * t0
+chk0 = t1 == 0
+t2 = out[0] * 1
+t4 = out[1] - 1
+t5 = out[1] * t4
+chk1 = t5 == 0
+t6 = out[1] * 2
+t7 = t2 + t6
+t8 = out[2] - 1
+t9 = out[2] * t8
+chk2 = t9 == 0
+t10 = out[2] * 4
+t11 = t7 + t10
+t12 = out[3] - 1
+t13 = out[3] * t12
+chk3 = t13 == 0
+t14 = out[3] * 8
+t15 = t11 + t14
+chk4 = t15 == in

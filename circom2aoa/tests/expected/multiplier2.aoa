@@ -1,0 +1,5 @@
+decl private a, b
+decl deferred c
+
+computedc = a * b
+outcheckc = computedc == c

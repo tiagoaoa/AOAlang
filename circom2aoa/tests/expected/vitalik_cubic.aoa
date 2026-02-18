@@ -1,0 +1,8 @@
+decl private u
+decl deferred k, out
+
+sym_1 = u * u
+y = sym_1 * u
+sym_2 = y + u
+computedout = sym_2 + k
+outcheckout = computedout == out

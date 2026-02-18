@@ -1,0 +1,11 @@
+decl private y, z
+decl deferred x, out
+
+m1_a = x
+m1_b = y
+m1_c = m1_a * m1_b
+m2_a = m1_c
+m2_b = z
+m2_c = m2_a * m2_b
+computedout = m2_c
+outcheckout = computedout == out
