@@ -727,7 +727,7 @@ Contributions welcome! Please ensure:
 
 ## Contact
 
-Tiago Alves - tiagoaoa@gmail.com
+Tiago Alves - tiago@darklake.fi
 
 ## Related Projects
 
