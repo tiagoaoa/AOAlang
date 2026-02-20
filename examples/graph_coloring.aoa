@@ -1,0 +1,93 @@
+# Graph 3-Coloring ZK Proof
+#
+# Proves knowledge of a valid 3-coloring of a specific graph
+# without revealing the coloring itself.
+#
+# Graph (5 vertices, 6 edges):
+#
+#     0
+#    / \
+#   1---2
+#   |   |
+#   3---4
+#
+# Edges: (0,1) (0,2) (1,2) (1,3) (2,4) (3,4)
+#
+# Private witness: c[0..4] color assignments in {0,1,2}
+#                  inv     inverse of product of edge differences
+# Public input:    k       number of colors (must equal 3)
+#
+# Constraints:
+#   1. Range:     c[i]*(c[i]-1)*(c[i]-2) == 0  for each vertex
+#   2. Adjacency: product of (c[u]-c[v]) over all edges is non-zero
+#                 proved via p * inv == 1
+#   3. k binding: k == 3
+
+decl private c[5]
+decl private inv
+decl deferred k
+
+# ============ RANGE CHECKS: c[i] in {0,1,2} ============
+# c[i]*(c[i]-1)*(c[i]-2) == 0  iff  c[i] in {0,1,2}
+
+zero = 0
+
+# vertex 0
+r0a = c[0] - 1
+r0b = c[0] - 2
+r0c = c[0] * r0a
+r0d = r0c * r0b
+rng0 = r0d == zero
+
+# vertex 1
+r1a = c[1] - 1
+r1b = c[1] - 2
+r1c = c[1] * r1a
+r1d = r1c * r1b
+rng1 = r1d == zero
+
+# vertex 2
+r2a = c[2] - 1
+r2b = c[2] - 2
+r2c = c[2] * r2a
+r2d = r2c * r2b
+rng2 = r2d == zero
+
+# vertex 3
+r3a = c[3] - 1
+r3b = c[3] - 2
+r3c = c[3] * r3a
+r3d = r3c * r3b
+rng3 = r3d == zero
+
+# vertex 4
+r4a = c[4] - 1
+r4b = c[4] - 2
+r4c = c[4] * r4a
+r4d = r4c * r4b
+rng4 = r4d == zero
+
+# ============ ADJACENCY: all edge endpoints differ ============
+# d[e] = c[u] - c[v] for each edge (u,v)
+# product of all differences must be non-zero (proved via inverse)
+
+d0 = c[0] - c[1]
+d1 = c[0] - c[2]
+d2 = c[1] - c[2]
+d3 = c[1] - c[3]
+d4 = c[2] - c[4]
+d5 = c[3] - c[4]
+
+p1 = d0 * d1
+p2 = p1 * d2
+p3 = p2 * d3
+p4 = p3 * d4
+p5 = p4 * d5
+
+one = 1
+prod = p5 * inv
+adj_chk = prod == one
+
+# ============ K BINDING: k == 3 ============
+three = 3
+k_chk = k == three
