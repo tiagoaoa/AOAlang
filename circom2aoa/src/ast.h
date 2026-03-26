@@ -75,6 +75,13 @@ typedef enum {
     SIG_OUTPUT
 } signal_dir_t;
 
+/* Signal visibility (explicit) */
+typedef enum {
+    SIG_VIS_UNSET,    /* determined by component main {public [...]} */
+    SIG_VIS_PRIVATE,
+    SIG_VIS_PUBLIC
+} signal_vis_t;
+
 /* Assignment operator */
 typedef enum {
     ASGN_EQ,        /* = */
@@ -98,6 +105,7 @@ struct stmt {
     union {
         struct {
             signal_dir_t dir;
+            signal_vis_t vis;
             char names[MAX_PARAMS][MAX_NAME_LEN];
             expr_t *sizes[MAX_PARAMS];  /* NULL for scalar */
             int count;

@@ -1,0 +1,6 @@
+decl private b
+decl deferred a, result
+
+diff = a - b
+computedresult = diff * diff
+outcheckresult = computedresult == result

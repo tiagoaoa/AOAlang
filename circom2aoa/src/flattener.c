@@ -582,10 +582,16 @@ static void handle_signal_decl(flattener_t *f, stmt_t *s, const char *prefix,
         }
 
         int is_pub = 0;
-        for (int j = 0; j < npublic; j++) {
-            if (strcmp(s->u.signal_decl.names[i], public_set[j]) == 0) {
-                is_pub = 1;
-                break;
+        if (s->u.signal_decl.vis == SIG_VIS_PUBLIC) {
+            is_pub = 1;
+        } else if (s->u.signal_decl.vis == SIG_VIS_PRIVATE) {
+            is_pub = 0;
+        } else {
+            for (int j = 0; j < npublic; j++) {
+                if (strcmp(s->u.signal_decl.names[i], public_set[j]) == 0) {
+                    is_pub = 1;
+                    break;
+                }
             }
         }
 

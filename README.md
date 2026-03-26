@@ -566,59 +566,60 @@ check  = out - 35        = x³ + x + k - 35
 
 The deferred input `k` propagates symbolically through the witness. The verifier "completes" the proof by binding `k` to a concrete value at verification time.
 
-### Example: Range Proof with Symbolic Weights
+### Example: Weighted Greater-Equal with Borrow Chain
 
-Proves `sum(w_i · x_i) >= t` where:
-- `x[i]` are **private** (secret values)
-- `w[i]` are **deferred** (symbolic weights - verifier provides)
-- `t` is **deferred** (symbolic threshold)
+Proves `u >= t` (4-bit) using bitwise subtraction with borrow chain:
+- `u[4]` are **private** (4-bit secret value)
+- `w` is **deferred** (symbolic weight multiplier)
+- `t[4]` are **deferred** (4-bit symbolic threshold)
 
 **Input (`weighted_sum_ge.aoa`):**
 ```aoa
-decl private x[2]
-decl private b[4]
-decl deferred w[2], t
+decl private u[4]
+decl deferred w
+decl deferred t[4]
 
-# Weighted sum
-prod0 = w[0] * x[0]
-prod1 = w[1] * x[1]
-weighted_sum = prod0 + prod1
+# Boolean constraints: each u[i] ∈ {0,1}
+u0_sq = u[0] * u[0]
+u0_bit = u0_sq - u[0]
+# ... (same for u[1], u[2], u[3])
 
-# diff = sum - t (must be >= 0)
-diff = weighted_sum - t
+# Reconstruct u_val = u[0] + 2*u[1] + 4*u[2] + 8*u[3]
+coef1 = u[1] + u[1]
+# ... doubling chain
+u_val = u_s012 + coef3
 
-# Bit decomposition proves diff >= 0 (4-bit range: 0-15)
-# Boolean constraint: b[i] ∈ {0,1} via b[i]² = b[i]
-b0_sq = b[0] * b[0]
-check_b0 = b0_sq == b[0]
-# ... (same for b[1], b[2], b[3])
+# Weighted value (symbolic)
+weighted_val = w * u_val
 
-# Reconstruct: diff = b[0] + 2·b[1] + 4·b[2] + 8·b[3]
-two_b1 = b[1] + b[1]
-two_b2 = b[2] + b[2]
-four_b2 = two_b2 + two_b2
-# ... etc
-reconstructed = sum_012 + eight_b3
+# 4-bit borrow-chain subtraction: u - t
+# Bit 0 (half subtractor):
+not_u0 = 1 - u[0]
+bw0 = not_u0 * t[0]
 
-# Verify decomposition
-final_check = reconstructed == diff
+# Bits 1-3 (full subtractors):
+# borrow[i] = OR(AND(!u[i], t[i]), AND(!u[i], bw[i-1]), AND(t[i], bw[i-1]))
+# ... propagates through bw1, bw2, bw3
+
+# Final: bw3 == 0 means no underflow → u >= t
+zero = 0
+sign_check = bw3 == zero
 ```
 
-**Symbolic witness propagation:**
+**Bitwise operations in R1CS:**
 ```
-prod0        = w[0] · x[0]              ← contains w[0]
-prod1        = w[1] · x[1]              ← contains w[1]
-weighted_sum = w[0]·x[0] + w[1]·x[1]    ← contains w[0], w[1]
-diff         = w[0]·x[0] + w[1]·x[1] - t ← contains w[0], w[1], t
+AND(a,b) = a * b
+NOT(a)   = 1 - a
+OR(a,b)  = a + b - a*b
 ```
 
-**How the range proof works:**
+**How it works:**
 
-1. `diff = sum - t` is computed symbolically
-2. Prover decomposes `diff` into bits `b[0..3]` (private)
-3. Boolean constraints ensure each `b[i] ∈ {0,1}`: `b[i]² = b[i]`
-4. Reconstruction constraint ensures: `diff = b[0] + 2·b[1] + 4·b[2] + 8·b[3]`
-5. If `diff` can be expressed as sum of non-negative bit values → `diff >= 0` → `sum >= t`
+1. Boolean constraints ensure each `u[i] ∈ {0,1}` via `u[i]² - u[i] = 0`
+2. Borrow chain propagates through each bit: `borrow[i]` indicates underflow at bit `i`
+3. Final borrow `bw3 = 0` → no underflow → `u >= t`
+4. `weighted_val = w * u_val` computes the symbolic weighted value for use in larger circuits
+5. Verifier substitutes `t[0..3]` at verification time
 
 **Verifier substitutes symbolic inputs:**
 ```

@@ -60,8 +60,9 @@ bin/circom2aoa --validate circuit.circom
 | `pragma circom 2.0.0` | Supported | Parsed and stored |
 | `template` with parameters | Supported | Inlined at instantiation |
 | `signal input/output` | Supported | Mapped to AOA `decl private`/`decl deferred` |
-| `signal private input` | Supported | Circom 1.x syntax, `private` keyword skipped |
-| `component main {public [...]}` | Supported | Controls deferred vs private mapping |
+| `signal private input` | Supported | Explicit `decl private` in AOA |
+| `signal public input` | Supported | Explicit `decl deferred` in AOA |
+| `component main {public [...]}` | Supported | Controls deferred vs private when no explicit visibility |
 | `component` instantiation | Supported | Deferred (lazy) body flattening |
 | `<==` (constrain + assign) | Supported | Produces AOA assignment or equality check |
 | `===` (constrain only) | Supported | Produces AOA equality check |
@@ -79,14 +80,24 @@ bin/circom2aoa --validate circuit.circom
 
 ## Signal Mapping
 
-Circom signals are mapped to AOA declarations based on the `component main` public list:
+Signal visibility in AOA is determined by two mechanisms. Explicit visibility on the signal declaration takes precedence; otherwise, the `component main {public [...]}` list is used.
+
+### Explicit visibility (takes precedence)
+
+| Circom | AOA |
+|--------|-----|
+| `signal private input x` | `decl private x` |
+| `signal public input x` | `decl deferred x` |
+
+### Implicit visibility (fallback)
+
+When no `private`/`public` keyword appears on the signal, visibility is determined by the `component main` declaration:
 
 | Circom | AOA | Condition |
 |--------|-----|-----------|
 | `signal input` | `decl deferred` | Listed in `{public [...]}` |
 | `signal input` | `decl private` | Not listed in `{public [...]}` |
-| `signal output` | `decl deferred` | Listed in `{public [...]}` |
-| `signal output` | `decl private` | Not listed in `{public [...]}` |
+| `signal output` | `decl deferred` | Always (outputs are public) |
 | Sub-component witness (`<--`) | `decl private` | Prover provides, `===` verifies |
 
 ## Examples
@@ -113,6 +124,37 @@ decl deferred a, b, c
 
 c = a * b
 ```
+
+### Explicit Signal Visibility
+
+**Circom:**
+```circom
+pragma circom 2.0.0;
+
+template CheckGE() {
+    signal public input a;
+    signal private input b;
+    signal output result;
+
+    signal diff;
+    diff <== a - b;
+    result <== diff * diff;
+}
+
+component main = CheckGE();
+```
+
+**AOA output:**
+```aoa
+decl private b
+decl deferred a, result
+
+diff = a - b
+computedresult = diff * diff
+outcheckresult = computedresult == result
+```
+
+`signal public input a` maps directly to `decl deferred`, `signal private input b` to `decl private`. No `component main {public [...]}` needed -- the visibility is declared on the signals themselves.
 
 ### Components (Chained Multipliers)
 
@@ -324,6 +366,7 @@ Each test transpiles a `.circom` file, diffs against `tests/expected/*.aoa`, and
 | `with_loop` | Num2Bits with for-loop unrolling |
 | `with_component` | Chained component instantiation |
 | `bitwise_ge` | GreaterEqThan using Num2Bits sub-component |
+| `visibility` | Explicit `signal private input` / `signal public input` |
 
 ## Known Limitations
 

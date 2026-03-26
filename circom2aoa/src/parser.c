@@ -319,14 +319,15 @@ static expr_t *parse_expression(parser_t *p) {
 static stmt_t *parse_signal_decl(parser_t *p) {
     expect(p, TOK_SIGNAL);
     signal_dir_t dir = SIG_NONE;
-    /* Skip 'private' keyword (Circom 1.x compat) — privacy is
-       determined by component main {public [...]} in Circom 2.x */
-    if (at(p, TOK_PRIVATE)) advance(p);
+    signal_vis_t vis = SIG_VIS_UNSET;
+    if (at(p, TOK_PRIVATE)) { vis = SIG_VIS_PRIVATE; advance(p); }
+    else if (at(p, TOK_PUBLIC)) { vis = SIG_VIS_PUBLIC; advance(p); }
     if (at(p, TOK_INPUT)) { dir = SIG_INPUT; advance(p); }
     else if (at(p, TOK_OUTPUT)) { dir = SIG_OUTPUT; advance(p); }
 
     stmt_t *s = stmt_alloc(STMT_SIGNAL_DECL);
     s->u.signal_decl.dir = dir;
+    s->u.signal_decl.vis = vis;
     s->u.signal_decl.count = 0;
 
     do {
