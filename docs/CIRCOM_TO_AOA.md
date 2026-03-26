@@ -2,20 +2,11 @@
 
 A self-contained C transpiler that compiles Circom circuits into flat AOAlang (`.aoa`) constraint files.
 
+For the Circom language reference (grammar, signals, constraints, operators, and AOAlang extensions), see [CIRCOM_REFERENCE.md](CIRCOM_REFERENCE.md).
+
 ## Overview
 
-circom2aoa implements a **superset of Circom 2.0** with AOAlang-specific extensions. It takes high-level circuits with templates, components, loops, and signal arrays, and produces flat AOAlang output where every operation is a single R1CS-compatible assignment.
-
-### Language Extensions
-
-circom2aoa extends standard [Circom 2.0](https://docs.circom.io/) with explicit signal visibility:
-
-```circom
-signal public input a;    // AOAlang extension: maps to decl deferred
-signal private input b;   // AOAlang extension: maps to decl private
-```
-
-In standard Circom 2.0, all inputs are private by default and public inputs are controlled only through `component main {public [...]}`. circom2aoa adds `public` and `private` keywords directly on signal declarations, giving each signal self-documenting visibility without relying on the main component declaration. Both mechanisms are supported and can be mixed -- explicit visibility on the signal takes precedence.
+circom2aoa implements a **superset of Circom 2.0** with AOAlang-specific extensions (notably `signal public/private input`). It takes high-level circuits with templates, components, loops, and signal arrays, and produces flat AOAlang output where every operation is a single R1CS-compatible assignment.
 
 **Pipeline:**
 

@@ -156,7 +156,8 @@ value2 = a      # Error: a is array, must be indexed
 
 - [**AOA Grammar Specification**](docs/AOA_GRAMMAR.md) - Complete formal grammar
 - [**AOA Quick Reference**](docs/AOA_QUICK_REFERENCE.md) - Syntax cheat sheet
-- [**Circom to AOA Transpiler**](docs/CIRCOM_TO_AOA.md) - circom2aoa usage, language extensions, and examples
+- [**Circom Language Reference**](docs/CIRCOM_REFERENCE.md) - Circom dialect grammar, signals, constraints, and AOAlang extensions
+- [**Circom to AOA Transpiler**](docs/CIRCOM_TO_AOA.md) - circom2aoa usage, pipeline, and examples
 
 ## Integration with AI/LLM Workflows
 
