@@ -20,6 +20,7 @@ AOAlang provides a robust parser for `.aoa` files that validates both syntax and
   - Dense R1CS matrices (`-d`)
   - QAP polynomials (`-q`)
   - C sanity checker code (`-c`)
+- **circom2aoa transpiler**: Compile Circom 2.0 circuits to AOAlang (see [docs/CIRCOM_TO_AOA.md](docs/CIRCOM_TO_AOA.md))
 - Built with Lex & Yacc for robust parsing
 - Standard POSIX-compatible build system
 
@@ -155,6 +156,7 @@ value2 = a      # Error: a is array, must be indexed
 
 - [**AOA Grammar Specification**](docs/AOA_GRAMMAR.md) - Complete formal grammar
 - [**AOA Quick Reference**](docs/AOA_QUICK_REFERENCE.md) - Syntax cheat sheet
+- [**Circom to AOA Transpiler**](docs/CIRCOM_TO_AOA.md) - circom2aoa usage, supported features, and examples
 
 ## Integration with AI/LLM Workflows
 
@@ -233,26 +235,29 @@ find . -name "*.aoa" -exec aoac {} \;
 AOAlang/
 ├── README.md           # This file
 ├── configure           # Build configuration script
-├── Makefile           # Build system
-├── src/               # Source code
-│   ├── aoa.l          # Lex lexer specification
-│   ├── aoa.y          # Yacc parser specification
-│   ├── main.c         # Main program entry
-│   ├── symbol_table.c # Symbol table for semantic analysis
-│   ├── symbol_table.h
-│   ├── r1cs.c         # R1CS constraint generation
-│   ├── r1cs.h
-│   ├── error.c        # Error reporting
-│   └── error.h
-├── bin/               # Compiled binaries (after make)
-├── examples/          # Example .aoa files
-│   ├── simple_quad.aoa
-│   ├── quadratic.aoa
-│   ├── uint4gt.aoa
-│   └── ...
-└── docs/              # Documentation
+├── Makefile            # Build system (aoac)
+├── src/                # aoac source code
+│   ├── aoa.l           # Lex lexer specification
+│   ├── aoa.y           # Yacc parser specification
+│   ├── main.c          # Main program entry
+│   ├── symbol_table.c  # Symbol table for semantic analysis
+│   ├── r1cs.c          # R1CS constraint generation
+│   └── error.c         # Error reporting
+├── circom2aoa/         # Circom-to-AOA transpiler
+│   ├── Makefile        # Build system (circom2aoa)
+│   └── src/
+│       ├── lexer.c     # Hand-written Circom tokenizer
+│       ├── parser.c    # Recursive descent parser
+│       ├── ast.c       # AST node constructors
+│       ├── flattener.c # Template inlining, loop unrolling
+│       ├── emitter.c   # AOA output generation
+│       └── main.c      # CLI entry point
+├── bin/                # Compiled binaries (aoac, circom2aoa)
+├── examples/           # Example .aoa files
+└── docs/               # Documentation
     ├── AOA_GRAMMAR.md
-    └── AOA_QUICK_REFERENCE.md
+    ├── AOA_QUICK_REFERENCE.md
+    └── CIRCOM_TO_AOA.md
 ```
 
 ## Development
