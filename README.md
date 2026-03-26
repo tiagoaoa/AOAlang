@@ -20,7 +20,7 @@ AOAlang provides a robust parser for `.aoa` files that validates both syntax and
   - Dense R1CS matrices (`-d`)
   - QAP polynomials (`-q`)
   - C sanity checker code (`-c`)
-- **circom2aoa transpiler**: Compile Circom 2.0 circuits to AOAlang (see [docs/CIRCOM_TO_AOA.md](docs/CIRCOM_TO_AOA.md))
+- **circom2aoa transpiler**: Compile Circom circuits to AOAlang, with extensions for explicit `signal public/private input` (see [docs/CIRCOM_TO_AOA.md](docs/CIRCOM_TO_AOA.md))
 - Built with Lex & Yacc for robust parsing
 - Standard POSIX-compatible build system
 
@@ -156,7 +156,7 @@ value2 = a      # Error: a is array, must be indexed
 
 - [**AOA Grammar Specification**](docs/AOA_GRAMMAR.md) - Complete formal grammar
 - [**AOA Quick Reference**](docs/AOA_QUICK_REFERENCE.md) - Syntax cheat sheet
-- [**Circom to AOA Transpiler**](docs/CIRCOM_TO_AOA.md) - circom2aoa usage, supported features, and examples
+- [**Circom to AOA Transpiler**](docs/CIRCOM_TO_AOA.md) - circom2aoa usage, language extensions, and examples
 
 ## Integration with AI/LLM Workflows
 

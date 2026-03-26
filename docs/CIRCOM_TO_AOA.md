@@ -1,10 +1,21 @@
 # circom2aoa - Circom to AOAlang Transpiler
 
-A self-contained C transpiler that compiles [Circom](https://docs.circom.io/) circuits into flat AOAlang (`.aoa`) constraint files.
+A self-contained C transpiler that compiles Circom circuits into flat AOAlang (`.aoa`) constraint files.
 
 ## Overview
 
-circom2aoa takes high-level Circom 2.0 circuits with templates, components, loops, and signal arrays, and produces flat AOAlang output where every operation is a single R1CS-compatible assignment.
+circom2aoa implements a **superset of Circom 2.0** with AOAlang-specific extensions. It takes high-level circuits with templates, components, loops, and signal arrays, and produces flat AOAlang output where every operation is a single R1CS-compatible assignment.
+
+### Language Extensions
+
+circom2aoa extends standard [Circom 2.0](https://docs.circom.io/) with explicit signal visibility:
+
+```circom
+signal public input a;    // AOAlang extension: maps to decl deferred
+signal private input b;   // AOAlang extension: maps to decl private
+```
+
+In standard Circom 2.0, all inputs are private by default and public inputs are controlled only through `component main {public [...]}`. circom2aoa adds `public` and `private` keywords directly on signal declarations, giving each signal self-documenting visibility without relying on the main component declaration. Both mechanisms are supported and can be mixed -- explicit visibility on the signal takes precedence.
 
 **Pipeline:**
 
@@ -53,15 +64,15 @@ bin/circom2aoa --validate circuit.circom
 | `--validate` | Run `aoac` on the output to verify valid AOA |
 | `-h`, `--help` | Show help |
 
-## Supported Circom Features
+## Supported Features
+
+### Standard Circom 2.0
 
 | Feature | Status | Notes |
 |---------|--------|-------|
 | `pragma circom 2.0.0` | Supported | Parsed and stored |
 | `template` with parameters | Supported | Inlined at instantiation |
 | `signal input/output` | Supported | Mapped to AOA `decl private`/`decl deferred` |
-| `signal private input` | Supported | Explicit `decl private` in AOA |
-| `signal public input` | Supported | Explicit `decl deferred` in AOA |
 | `component main {public [...]}` | Supported | Controls deferred vs private when no explicit visibility |
 | `component` instantiation | Supported | Deferred (lazy) body flattening |
 | `<==` (constrain + assign) | Supported | Produces AOA assignment or equality check |
@@ -78,26 +89,30 @@ bin/circom2aoa --validate circuit.circom
 | Runtime `if`/`else` on signals | Not supported | Requires signal-dependent branching |
 | Parallel component `parallel` | Not supported | |
 
+### AOAlang Extensions (not in standard Circom)
+
+| Feature | AOA Mapping | Notes |
+|---------|-------------|-------|
+| `signal private input x` | `decl private x` | Explicit private visibility on the signal |
+| `signal public input x` | `decl deferred x` | Explicit public visibility on the signal |
+
+These extensions allow signal visibility to be declared where the signal is defined, rather than requiring all public inputs to be listed in the `component main {public [...]}` declaration. When both mechanisms are present, explicit visibility on the signal takes precedence.
+
 ## Signal Mapping
 
-Signal visibility in AOA is determined by two mechanisms. Explicit visibility on the signal declaration takes precedence; otherwise, the `component main {public [...]}` list is used.
+Signal visibility in AOA is resolved with the following precedence:
 
-### Explicit visibility (takes precedence)
+1. **Explicit visibility on the signal** (AOAlang extension) -- `signal public input` or `signal private input`
+2. **`component main {public [...]}`** (standard Circom 2.0) -- names listed are public
+3. **Default** -- unlisted inputs are private, outputs are always public
 
-| Circom | AOA |
-|--------|-----|
-| `signal private input x` | `decl private x` |
-| `signal public input x` | `decl deferred x` |
-
-### Implicit visibility (fallback)
-
-When no `private`/`public` keyword appears on the signal, visibility is determined by the `component main` declaration:
-
-| Circom | AOA | Condition |
-|--------|-----|-----------|
-| `signal input` | `decl deferred` | Listed in `{public [...]}` |
-| `signal input` | `decl private` | Not listed in `{public [...]}` |
-| `signal output` | `decl deferred` | Always (outputs are public) |
+| Circom | AOA | Rule |
+|--------|-----|------|
+| `signal public input x` | `decl deferred x` | Explicit (extension) |
+| `signal private input x` | `decl private x` | Explicit (extension) |
+| `signal input x` + listed in `{public [x]}` | `decl deferred x` | Implicit (standard) |
+| `signal input x` + not listed | `decl private x` | Implicit (standard) |
+| `signal output x` | `decl deferred x` | Always public |
 | Sub-component witness (`<--`) | `decl private` | Prover provides, `===` verifies |
 
 ## Examples
@@ -125,15 +140,17 @@ decl deferred a, b, c
 c = a * b
 ```
 
-### Explicit Signal Visibility
+### Explicit Signal Visibility (AOAlang Extension)
 
-**Circom:**
+This example uses the `signal public input` / `signal private input` syntax, which is an AOAlang extension not present in standard Circom 2.0. Visibility is declared directly on the signal -- no `component main {public [...]}` needed.
+
+**Circom (with AOAlang extensions):**
 ```circom
 pragma circom 2.0.0;
 
 template CheckGE() {
-    signal public input a;
-    signal private input b;
+    signal public input a;    // AOAlang extension
+    signal private input b;   // AOAlang extension
     signal output result;
 
     signal diff;
@@ -154,7 +171,7 @@ computedresult = diff * diff
 outcheckresult = computedresult == result
 ```
 
-`signal public input a` maps directly to `decl deferred`, `signal private input b` to `decl private`. No `component main {public [...]}` needed -- the visibility is declared on the signals themselves.
+`signal public input a` maps directly to `decl deferred`, `signal private input b` to `decl private`.
 
 ### Components (Chained Multipliers)
 
