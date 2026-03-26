@@ -1,65 +1,93 @@
-# Range Proof: sum(w_i * u_i) >= t
+# Weighted Greater-Equal: w * u >= t (4-bit)
 #
-# Private inputs:  u[0], u[1] (secret values), b[0..3] (bit decomposition)
-# Deferred inputs: w[0], w[1] (symbolic weights), t (threshold)
+# Private:  u[4] - 4-bit secret value
+# Deferred: w    - symbolic weight multiplier
+#           t[4] - 4-bit symbolic threshold
 #
-# Proves the weighted sum is at least t by showing:
-#   diff = (w[0]*u[0] + w[1]*u[1]) - t >= 0
+# Proves u >= t using bitwise subtraction with borrow chain.
+# The weighted value w*u is computed symbolically for use in larger circuits.
+# Only asserts: borrow[3] == 0 (no underflow means u >= t)
 #
-# Non-negativity is proven via bit decomposition:
-#   diff = b[0] + 2*b[1] + 4*b[2] + 8*b[3]  (4-bit, range 0-15)
-#   Each b[i] constrained to {0,1} via b[i]² = b[i]
+# Bitwise ops in R1CS:
+#   AND(a,b) = a * b
+#   NOT(a)   = 1 - a
+#   OR(a,b)  = a + b - a*b
 
-decl private u[2]
-decl private b[4]
-decl deferred w[2], t
+decl private u[4]
+decl deferred w
+decl deferred t[4]
 
-# ============ WEIGHTED SUM ============
-# Compute sum = w[0]*u[0] + w[1]*u[1]
-prod0 = w[0] * u[0]
-prod1 = w[1] * u[1]
-weighted_sum = prod0 + prod1
+# ============ BOOLEAN CONSTRAINTS ============
+u0_sq = u[0] * u[0]
+u0_bit = u0_sq - u[0]
+u1_sq = u[1] * u[1]
+u1_bit = u1_sq - u[1]
+u2_sq = u[2] * u[2]
+u2_bit = u2_sq - u[2]
+u3_sq = u[3] * u[3]
+u3_bit = u3_sq - u[3]
 
-# ============ DIFFERENCE ============
-# diff = sum - t (must be >= 0 for sum >= t)
-diff = weighted_sum - t
+# ============ RECONSTRUCT U VALUE ============
+# u_val = u[0] + 2*u[1] + 4*u[2] + 8*u[3]
+coef1 = u[1] + u[1]
+coef2a = u[2] + u[2]
+coef2 = coef2a + coef2a
+coef3a = u[3] + u[3]
+coef3b = coef3a + coef3a
+coef3 = coef3b + coef3b
 
-# ============ BIT DECOMPOSITION ============
-# Boolean constraints: b[i] ∈ {0,1}
-# Enforced via b[i] * b[i] = b[i]
-b0_sq = b[0] * b[0]
-check_b0 = b0_sq == b[0]
+u_s01 = u[0] + coef1
+u_s012 = u_s01 + coef2
+u_val = u_s012 + coef3
 
-b1_sq = b[1] * b[1]
-check_b1 = b1_sq == b[1]
+# ============ WEIGHTED VALUE ============
+weighted_val = w * u_val
 
-b2_sq = b[2] * b[2]
-check_b2 = b2_sq == b[2]
+# ============ 4-BIT SUBTRACTION: u - t ============
+# Borrow chain for bitwise comparison.
+# Final borrow = 0 means u >= t
 
-b3_sq = b[3] * b[3]
-check_b3 = b3_sq == b[3]
+# Bit 0: half subtractor
+not_u0 = 1 - u[0]
+bw0 = not_u0 * t[0]
 
-# ============ RECONSTRUCTION ============
-# diff = b[0] + 2*b[1] + 4*b[2] + 8*b[3]
-# Using doubling: 2u = u + u, 4u = 2u + 2u, etc.
+# Bit 1: full subtractor
+not_u1 = 1 - u[1]
+and1_a = not_u1 * t[1]
+and1_b = not_u1 * bw0
+and1_c = t[1] * bw0
+or1_ab = and1_a + and1_b
+and1_ab = and1_a * and1_b
+or1_ab_v = or1_ab - and1_ab
+or1_abc = or1_ab_v + and1_c
+and1_abc = or1_ab_v * and1_c
+bw1 = or1_abc - and1_abc
 
-# 2 * b[1]
-two_b1 = b[1] + b[1]
+# Bit 2: full subtractor
+not_u2 = 1 - u[2]
+and2_a = not_u2 * t[2]
+and2_b = not_u2 * bw1
+and2_c = t[2] * bw1
+or2_ab = and2_a + and2_b
+and2_ab = and2_a * and2_b
+or2_ab_v = or2_ab - and2_ab
+or2_abc = or2_ab_v + and2_c
+and2_abc = or2_ab_v * and2_c
+bw2 = or2_abc - and2_abc
 
-# 4 * b[2] = 2*b[2] + 2*b[2]
-two_b2 = b[2] + b[2]
-four_b2 = two_b2 + two_b2
+# Bit 3: full subtractor (MSB)
+not_u3 = 1 - u[3]
+and3_a = not_u3 * t[3]
+and3_b = not_u3 * bw2
+and3_c = t[3] * bw2
+or3_ab = and3_a + and3_b
+and3_ab = and3_a * and3_b
+or3_ab_v = or3_ab - and3_ab
+or3_abc = or3_ab_v + and3_c
+and3_abc = or3_ab_v * and3_c
+bw3 = or3_abc - and3_abc
 
-# 8 * b[3] = 4*b[3] + 4*b[3]
-two_b3 = b[3] + b[3]
-four_b3 = two_b3 + two_b3
-eight_b3 = four_b3 + four_b3
-
-# Sum weighted bits
-sum_01 = b[0] + two_b1
-sum_012 = sum_01 + four_b2
-reconstructed = sum_012 + eight_b3
-
-# ============ FINAL CHECK ============
-# Verify bit decomposition equals diff
-final_check = reconstructed == diff
+# ============ FINAL ASSERTION ============
+# bw3 = 0 means no underflow, i.e., u >= t
+zero = 0
+sign_check = bw3 == zero

@@ -1,0 +1,4 @@
+decl deferred a, b, c
+
+computedc = a * b
+outcheckc = computedc == c

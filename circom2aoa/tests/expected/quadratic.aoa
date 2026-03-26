@@ -1,0 +1,8 @@
+decl private x
+decl deferred a, b, result
+
+x_squared = x * x
+ax = a * x
+sum1 = x_squared + ax
+computedresult = sum1 + b
+outcheckresult = computedresult == result

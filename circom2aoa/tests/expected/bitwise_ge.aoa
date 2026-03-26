@@ -1,0 +1,31 @@
+decl private a, n2b_out_0, n2b_out_1, n2b_out_2, n2b_out_3, n2b_out_4
+decl deferred b
+
+t0 = a - b
+n2b_in = t0 + 16
+t1 = n2b_out_0 - 1
+t2 = n2b_out_0 * t1
+chk0 = t2 == 0
+t3 = n2b_out_0 * 1
+t5 = n2b_out_1 - 1
+t6 = n2b_out_1 * t5
+chk1 = t6 == 0
+t7 = n2b_out_1 * 2
+t8 = t3 + t7
+t9 = n2b_out_2 - 1
+t10 = n2b_out_2 * t9
+chk2 = t10 == 0
+t11 = n2b_out_2 * 4
+t12 = t8 + t11
+t13 = n2b_out_3 - 1
+t14 = n2b_out_3 * t13
+chk3 = t14 == 0
+t15 = n2b_out_3 * 8
+t16 = t12 + t15
+t17 = n2b_out_4 - 1
+t18 = n2b_out_4 * t17
+chk4 = t18 == 0
+t19 = n2b_out_4 * 16
+t20 = t16 + t19
+chk5 = t20 == n2b_in
+chk6 = n2b_out_4 == 1
