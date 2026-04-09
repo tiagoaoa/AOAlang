@@ -15,7 +15,7 @@
 /* Sparse matrix entry */
 typedef struct {
     int col;        /* Witness index (column) */
-    int coeff;      /* Coefficient value */
+    char coeff[80]; /* Coefficient value (string to preserve precision) */
 } r1cs_entry_t;
 
 /* Single R1CS constraint row */
@@ -51,7 +51,7 @@ typedef struct expr_node {
             char *array_name;
             int index;
         } array_access;              /* EXPR_ARRAY_ACCESS */
-        int const_val;               /* EXPR_CONST */
+        char *const_val;             /* EXPR_CONST (string to preserve precision) */
         struct {
             struct expr_node *left;
             struct expr_node *right;
@@ -112,13 +112,13 @@ void r1cs_register_witness(const char *name, int witness_index,
 void r1cs_begin_constraint(const char *lhs_var, const char *comment);
 
 /* Add entry to current constraint's A vector */
-void r1cs_add_A(int col, int coeff);
+void r1cs_add_A(int col, const char *coeff);
 
 /* Add entry to current constraint's B vector */
-void r1cs_add_B(int col, int coeff);
+void r1cs_add_B(int col, const char *coeff);
 
 /* Add entry to current constraint's C vector */
-void r1cs_add_C(int col, int coeff);
+void r1cs_add_C(int col, const char *coeff);
 
 /* Finalize current constraint */
 void r1cs_end_constraint(void);
@@ -127,7 +127,7 @@ void r1cs_end_constraint(void);
 void r1cs_add_mul_constraint(const char *result, const char *left, const char *right);
 void r1cs_add_add_constraint(const char *result, const char *left, const char *right);
 void r1cs_add_sub_constraint(const char *result, const char *left, const char *right);
-void r1cs_add_const_constraint(const char *result, int value);
+void r1cs_add_const_constraint(const char *result, const char *value);
 void r1cs_add_eq_constraint(const char *result, const char *left, const char *right);
 
 /* Set symbolic expression for a gate */
@@ -157,7 +157,7 @@ void r1cs_generate_c_checker(FILE *out, const char *circuit_name);
 /* Expression node helpers */
 expr_node_t *expr_create_var(const char *name);
 expr_node_t *expr_create_array(const char *name, int index);
-expr_node_t *expr_create_const(int value);
+expr_node_t *expr_create_const(const char *value);
 expr_node_t *expr_create_binary(expr_type_t type, expr_node_t *left, expr_node_t *right);
 void expr_free(expr_node_t *node);
 char *expr_to_string(expr_node_t *node);

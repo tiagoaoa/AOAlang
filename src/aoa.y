@@ -84,19 +84,26 @@ static void generate_constraint(void) {
     } else if (expr_op == 'E' && expr_n_operands >= 2) {
         r1cs_add_eq_constraint(current_lhs, expr_operands[0], expr_operands[1]);
     } else if (expr_n_operands == 1) {
-        char *endptr;
-        long val = strtol(expr_operands[0], &endptr, 10);
-        if (*endptr == '\0') {
-            r1cs_add_const_constraint(current_lhs, (int)val);
+        /* Check if operand is a numeric constant (starts with digit or '-' followed by digit) */
+        const char *p = expr_operands[0];
+        int is_num = 0;
+        if (*p == '-') p++;
+        if (*p >= '0' && *p <= '9') {
+            const char *q = p;
+            while (*q >= '0' && *q <= '9') q++;
+            if (*q == '\0' || *q == '.') is_num = 1;
+        }
+        if (is_num) {
+            r1cs_add_const_constraint(current_lhs, expr_operands[0]);
         } else {
             /* Identity */
             r1cs_begin_constraint(current_lhs, current_lhs);
             int op_idx = r1cs_get_witness_index(expr_operands[0]);
             int res_idx = r1cs_get_witness_index(current_lhs);
             if (op_idx >= 0 && res_idx >= 0) {
-                r1cs_add_A(op_idx, 1);
-                r1cs_add_B(0, 1);
-                r1cs_add_C(res_idx, 1);
+                r1cs_add_A(op_idx, "1");
+                r1cs_add_B(0, "1");
+                r1cs_add_C(res_idx, "1");
             }
             r1cs_end_constraint();
             r1cs_set_gate_expr(current_lhs, expr_operands[0]);

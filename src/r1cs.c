@@ -132,7 +132,7 @@ void r1cs_begin_constraint(const char *lhs_var, const char *comment) {
     c->comment = comment ? strdup(comment) : NULL;
 }
 
-void r1cs_add_A(int col, int coeff) {
+void r1cs_add_A(int col, const char *coeff) {
     if (current_constraint < 0 || current_constraint >= MAX_CONSTRAINTS) return;
     r1cs_constraint_t *c = &r1cs.constraints[current_constraint];
 
@@ -142,11 +142,12 @@ void r1cs_add_A(int col, int coeff) {
     }
 
     c->A[c->A_count].col = col;
-    c->A[c->A_count].coeff = coeff;
+    strncpy(c->A[c->A_count].coeff, coeff, 79);
+    c->A[c->A_count].coeff[79] = '\0';
     c->A_count++;
 }
 
-void r1cs_add_B(int col, int coeff) {
+void r1cs_add_B(int col, const char *coeff) {
     if (current_constraint < 0 || current_constraint >= MAX_CONSTRAINTS) return;
     r1cs_constraint_t *c = &r1cs.constraints[current_constraint];
 
@@ -156,11 +157,12 @@ void r1cs_add_B(int col, int coeff) {
     }
 
     c->B[c->B_count].col = col;
-    c->B[c->B_count].coeff = coeff;
+    strncpy(c->B[c->B_count].coeff, coeff, 79);
+    c->B[c->B_count].coeff[79] = '\0';
     c->B_count++;
 }
 
-void r1cs_add_C(int col, int coeff) {
+void r1cs_add_C(int col, const char *coeff) {
     if (current_constraint < 0 || current_constraint >= MAX_CONSTRAINTS) return;
     r1cs_constraint_t *c = &r1cs.constraints[current_constraint];
 
@@ -170,7 +172,8 @@ void r1cs_add_C(int col, int coeff) {
     }
 
     c->C[c->C_count].col = col;
-    c->C[c->C_count].coeff = coeff;
+    strncpy(c->C[c->C_count].coeff, coeff, 79);
+    c->C[c->C_count].coeff[79] = '\0';
     c->C_count++;
 }
 
@@ -207,33 +210,50 @@ int r1cs_get_witness_index(const char *var_name) {
         }
     }
 
-    /* Check if it's a number (constant) */
-    char *endptr;
-    long val = strtol(var_name, &endptr, 10);
-    if (*endptr == '\0') {
-        /* It's a constant - return index 0 (constant "1") */
-        return 0;
+    /* Check if it's a number (constant) - return index 0 (the constant "1" wire) */
+    const char *p = var_name;
+    if (*p == '-') p++;
+    if (*p >= '0' && *p <= '9') {
+        while (*p >= '0' && *p <= '9') p++;
+        if (*p == '\0') return 0;
     }
 
     return -1;
 }
 
-/* Helper to check if string is a numeric constant and get its value */
-static int is_constant(const char *str, int *value) {
-    char *endptr;
-    long val = strtol(str, &endptr, 10);
-    if (*endptr == '\0') {
-        *value = (int)val;
-        return 1;
+/* Helper to check if string is a numeric constant and get its string value */
+static int is_constant(const char *str, char *value_out) {
+    const char *p = str;
+    if (*p == '-') p++;
+    if (*p >= '0' && *p <= '9') {
+        while (*p >= '0' && *p <= '9') p++;
+        if (*p == '\0' || *p == '.') {
+            strncpy(value_out, str, 79);
+            value_out[79] = '\0';
+            return 1;
+        }
     }
     return 0;
 }
 
+/* Helper to negate a string coefficient */
+static void negate_coeff(const char *in, char *out, int out_size) {
+    if (in[0] == '-') {
+        strncpy(out, in + 1, out_size - 1);
+    } else if (strcmp(in, "0") == 0) {
+        strncpy(out, "0", out_size - 1);
+    } else {
+        out[0] = '-';
+        strncpy(out + 1, in, out_size - 2);
+    }
+    out[out_size - 1] = '\0';
+}
+
 void r1cs_add_mul_constraint(const char *result, const char *left, const char *right) {
     int result_idx = r1cs_get_witness_index(result);
-    int left_const_val, right_const_val;
-    int left_is_const = is_constant(left, &left_const_val);
-    int right_is_const = is_constant(right, &right_const_val);
+    char left_const_val[80], right_const_val[80];
+    int left_is_const = is_constant(left, left_const_val);
+    int right_is_const = is_constant(right, right_const_val);
 
     if (result_idx < 0) {
         fprintf(stderr, "Error: Invalid variable in multiplication constraint\n");
@@ -255,17 +275,17 @@ void r1cs_add_mul_constraint(const char *result, const char *left, const char *r
         r1cs_add_A(0, left_const_val);
     } else {
         int left_idx = r1cs_get_witness_index(left);
-        if (left_idx >= 0) r1cs_add_A(left_idx, 1);
+        if (left_idx >= 0) r1cs_add_A(left_idx, "1");
     }
 
     if (right_is_const) {
         r1cs_add_B(0, right_const_val);
     } else {
         int right_idx = r1cs_get_witness_index(right);
-        if (right_idx >= 0) r1cs_add_B(right_idx, 1);
+        if (right_idx >= 0) r1cs_add_B(right_idx, "1");
     }
 
-    r1cs_add_C(result_idx, 1);
+    r1cs_add_C(result_idx, "1");
     r1cs_end_constraint();
 
     /* Set symbolic expression for gate */
@@ -276,9 +296,9 @@ void r1cs_add_mul_constraint(const char *result, const char *left, const char *r
 
 void r1cs_add_add_constraint(const char *result, const char *left, const char *right) {
     int result_idx = r1cs_get_witness_index(result);
-    int left_const_val, right_const_val;
-    int left_is_const = is_constant(left, &left_const_val);
-    int right_is_const = is_constant(right, &right_const_val);
+    char left_const_val[80], right_const_val[80];
+    int left_is_const = is_constant(left, left_const_val);
+    int right_is_const = is_constant(right, right_const_val);
 
     if (result_idx < 0) {
         fprintf(stderr, "Error: Invalid variable in addition constraint\n");
@@ -295,7 +315,7 @@ void r1cs_add_add_constraint(const char *result, const char *left, const char *r
         r1cs_add_A(0, left_const_val);  /* coefficient * constant_1 */
     } else {
         int left_idx = r1cs_get_witness_index(left);
-        if (left_idx >= 0) r1cs_add_A(left_idx, 1);
+        if (left_idx >= 0) r1cs_add_A(left_idx, "1");
     }
 
     /* Handle right operand */
@@ -303,11 +323,11 @@ void r1cs_add_add_constraint(const char *result, const char *left, const char *r
         r1cs_add_A(0, right_const_val);  /* coefficient * constant_1 */
     } else {
         int right_idx = r1cs_get_witness_index(right);
-        if (right_idx >= 0) r1cs_add_A(right_idx, 1);
+        if (right_idx >= 0) r1cs_add_A(right_idx, "1");
     }
 
-    r1cs_add_B(0, 1);  /* Constant 1 */
-    r1cs_add_C(result_idx, 1);
+    r1cs_add_B(0, "1");  /* Constant 1 */
+    r1cs_add_C(result_idx, "1");
     r1cs_end_constraint();
 
     /* Set symbolic expression */
@@ -318,9 +338,9 @@ void r1cs_add_add_constraint(const char *result, const char *left, const char *r
 
 void r1cs_add_sub_constraint(const char *result, const char *left, const char *right) {
     int result_idx = r1cs_get_witness_index(result);
-    int left_const_val, right_const_val;
-    int left_is_const = is_constant(left, &left_const_val);
-    int right_is_const = is_constant(right, &right_const_val);
+    char left_const_val[80], right_const_val[80];
+    int left_is_const = is_constant(left, left_const_val);
+    int right_is_const = is_constant(right, right_const_val);
 
     if (result_idx < 0) {
         fprintf(stderr, "Error: Invalid variable in subtraction constraint\n");
@@ -337,19 +357,21 @@ void r1cs_add_sub_constraint(const char *result, const char *left, const char *r
         r1cs_add_A(0, left_const_val);  /* coefficient * constant_1 */
     } else {
         int left_idx = r1cs_get_witness_index(left);
-        if (left_idx >= 0) r1cs_add_A(left_idx, 1);
+        if (left_idx >= 0) r1cs_add_A(left_idx, "1");
     }
 
     /* Handle right operand (negated for subtraction) */
     if (right_is_const) {
-        r1cs_add_A(0, -right_const_val);  /* -coefficient * constant_1 */
+        char neg_val[80];
+        negate_coeff(right_const_val, neg_val, sizeof(neg_val));
+        r1cs_add_A(0, neg_val);  /* -coefficient * constant_1 */
     } else {
         int right_idx = r1cs_get_witness_index(right);
-        if (right_idx >= 0) r1cs_add_A(right_idx, -1);
+        if (right_idx >= 0) r1cs_add_A(right_idx, "-1");
     }
 
-    r1cs_add_B(0, 1);  /* Constant 1 */
-    r1cs_add_C(result_idx, 1);
+    r1cs_add_B(0, "1");  /* Constant 1 */
+    r1cs_add_C(result_idx, "1");
     r1cs_end_constraint();
 
     /* Set symbolic expression */
@@ -358,7 +380,7 @@ void r1cs_add_sub_constraint(const char *result, const char *left, const char *r
     r1cs_set_gate_expr(result, expr);
 }
 
-void r1cs_add_const_constraint(const char *result, int value) {
+void r1cs_add_const_constraint(const char *result, const char *value) {
     int result_idx = r1cs_get_witness_index(result);
 
     if (result_idx < 0) {
@@ -367,19 +389,19 @@ void r1cs_add_const_constraint(const char *result, int value) {
     }
 
     char comment[256];
-    snprintf(comment, sizeof(comment), "%s = %d", result, value);
+    snprintf(comment, sizeof(comment), "%s = %s", result, value);
 
     r1cs_begin_constraint(result, comment);
-    r1cs_add_A(result_idx, 1);
-    r1cs_add_A(0, -value);  /* -value * 1 */
-    r1cs_add_B(0, 1);       /* Constant 1 */
+    r1cs_add_A(result_idx, "1");
+    char neg_val[80];
+    negate_coeff(value, neg_val, sizeof(neg_val));
+    r1cs_add_A(0, neg_val);  /* -value * 1 */
+    r1cs_add_B(0, "1");      /* Constant 1 */
     /* C = 0 (empty) */
     r1cs_end_constraint();
 
     /* Set symbolic expression */
-    char expr[64];
-    snprintf(expr, sizeof(expr), "%d", value);
-    r1cs_set_gate_expr(result, expr);
+    r1cs_set_gate_expr(result, value);
 }
 
 void r1cs_add_eq_constraint(const char *result, const char *left, const char *right) {
@@ -390,9 +412,9 @@ void r1cs_add_eq_constraint(const char *result, const char *left, const char *ri
     snprintf(comment, sizeof(comment), "%s: %s == %s", result, left, right);
 
     r1cs_begin_constraint(result, comment);
-    r1cs_add_A(left_idx, 1);
-    r1cs_add_A(right_idx, -1);
-    r1cs_add_B(0, 1);  /* Constant 1 */
+    r1cs_add_A(left_idx, "1");
+    r1cs_add_A(right_idx, "-1");
+    r1cs_add_B(0, "1");  /* Constant 1 */
     /* C = 0: (left - right) * 1 = 0 */
     r1cs_end_constraint();
 
@@ -546,7 +568,7 @@ void r1cs_generate_json(FILE *out, const char *circuit_name) {
         r1cs_constraint_t *c = &r1cs.constraints[i];
         fprintf(out, "      {\"row\": %d, \"entries\": [", i);
         for (int j = 0; j < c->A_count; j++) {
-            fprintf(out, "{\"col\": %d, \"val\": %d}", c->A[j].col, c->A[j].coeff);
+            fprintf(out, "{\"col\": %d, \"val\": \"%s\"}", c->A[j].col, c->A[j].coeff);
             if (j < c->A_count - 1) fprintf(out, ", ");
         }
         fprintf(out, "]");
@@ -566,7 +588,7 @@ void r1cs_generate_json(FILE *out, const char *circuit_name) {
         r1cs_constraint_t *c = &r1cs.constraints[i];
         fprintf(out, "      {\"row\": %d, \"entries\": [", i);
         for (int j = 0; j < c->B_count; j++) {
-            fprintf(out, "{\"col\": %d, \"val\": %d}", c->B[j].col, c->B[j].coeff);
+            fprintf(out, "{\"col\": %d, \"val\": \"%s\"}", c->B[j].col, c->B[j].coeff);
             if (j < c->B_count - 1) fprintf(out, ", ");
         }
         fprintf(out, "]}");
@@ -581,7 +603,7 @@ void r1cs_generate_json(FILE *out, const char *circuit_name) {
         r1cs_constraint_t *c = &r1cs.constraints[i];
         fprintf(out, "      {\"row\": %d, \"entries\": [", i);
         for (int j = 0; j < c->C_count; j++) {
-            fprintf(out, "{\"col\": %d, \"val\": %d}", c->C[j].col, c->C[j].coeff);
+            fprintf(out, "{\"col\": %d, \"val\": \"%s\"}", c->C[j].col, c->C[j].coeff);
             if (j < c->C_count - 1) fprintf(out, ", ");
         }
         fprintf(out, "]}");
@@ -632,25 +654,26 @@ void r1cs_generate_dense(FILE *out) {
     }
     fprintf(out, "]\n");
 
+    /* Helper: build dense string row from sparse entries */
+    /* Allocate a row of string pointers, default "0" */
+    char **row = malloc(n_vars * sizeof(char *));
+
     /* Print A matrix */
     fprintf(out, "A\n");
     for (int i = 0; i < n_cons; i++) {
         r1cs_constraint_t *c = &r1cs.constraints[i];
 
-        /* Build dense row */
-        int *row = calloc(n_vars, sizeof(int));
+        for (int j = 0; j < n_vars; j++) row[j] = "0";
         for (int j = 0; j < c->A_count; j++) {
             row[c->A[j].col] = c->A[j].coeff;
         }
 
-        /* Print row */
         fprintf(out, "[");
         for (int j = 0; j < n_vars; j++) {
-            fprintf(out, "%d", row[j]);
+            fprintf(out, "%s", row[j]);
             if (j < n_vars - 1) fprintf(out, ", ");
         }
         fprintf(out, "]\n");
-        free(row);
     }
 
     /* Print B matrix */
@@ -658,20 +681,17 @@ void r1cs_generate_dense(FILE *out) {
     for (int i = 0; i < n_cons; i++) {
         r1cs_constraint_t *c = &r1cs.constraints[i];
 
-        /* Build dense row */
-        int *row = calloc(n_vars, sizeof(int));
+        for (int j = 0; j < n_vars; j++) row[j] = "0";
         for (int j = 0; j < c->B_count; j++) {
             row[c->B[j].col] = c->B[j].coeff;
         }
 
-        /* Print row */
         fprintf(out, "[");
         for (int j = 0; j < n_vars; j++) {
-            fprintf(out, "%d", row[j]);
+            fprintf(out, "%s", row[j]);
             if (j < n_vars - 1) fprintf(out, ", ");
         }
         fprintf(out, "]\n");
-        free(row);
     }
 
     /* Print C matrix */
@@ -679,21 +699,20 @@ void r1cs_generate_dense(FILE *out) {
     for (int i = 0; i < n_cons; i++) {
         r1cs_constraint_t *c = &r1cs.constraints[i];
 
-        /* Build dense row */
-        int *row = calloc(n_vars, sizeof(int));
+        for (int j = 0; j < n_vars; j++) row[j] = "0";
         for (int j = 0; j < c->C_count; j++) {
             row[c->C[j].col] = c->C[j].coeff;
         }
 
-        /* Print row */
         fprintf(out, "[");
         for (int j = 0; j < n_vars; j++) {
-            fprintf(out, "%d", row[j]);
+            fprintf(out, "%s", row[j]);
             if (j < n_vars - 1) fprintf(out, ", ");
         }
         fprintf(out, "]\n");
-        free(row);
     }
+
+    free(row);
 }
 
 /*
@@ -826,7 +845,13 @@ void r1cs_generate_qap(FILE *out) {
         return;
     }
 
-    /* Build dense matrices */
+    /* NOTE: QAP polynomial generation uses double/float arithmetic via
+       Lagrange interpolation. Coefficients are converted to int via atoi().
+       This does NOT support bigint (>254-bit) coefficients. QAP output is
+       a debug/educational tool; for production use, the JSON sparse output
+       preserves full coefficient precision as strings. */
+
+    /* Build dense matrices (coefficients converted to int for polynomial math) */
     int **A_dense = malloc(n_cons * sizeof(int *));
     int **B_dense = malloc(n_cons * sizeof(int *));
     int **C_dense = malloc(n_cons * sizeof(int *));
@@ -838,13 +863,13 @@ void r1cs_generate_qap(FILE *out) {
 
         r1cs_constraint_t *c = &r1cs.constraints[i];
         for (int j = 0; j < c->A_count; j++) {
-            A_dense[i][c->A[j].col] = c->A[j].coeff;
+            A_dense[i][c->A[j].col] = atoi(c->A[j].coeff);
         }
         for (int j = 0; j < c->B_count; j++) {
-            B_dense[i][c->B[j].col] = c->B[j].coeff;
+            B_dense[i][c->B[j].col] = atoi(c->B[j].coeff);
         }
         for (int j = 0; j < c->C_count; j++) {
-            C_dense[i][c->C[j].col] = c->C[j].coeff;
+            C_dense[i][c->C[j].col] = atoi(c->C[j].coeff);
         }
     }
 
@@ -1297,6 +1322,10 @@ void r1cs_generate_c_checker(FILE *out, const char *circuit_name) {
     fprintf(out, " * Auto-generated by AOAlang compiler\n");
     fprintf(out, " *\n");
     fprintf(out, " * Verifies: A*w . B*w = C*w for each constraint\n");
+    fprintf(out, " *\n");
+    fprintf(out, " * NOTE: This checker uses long long (64-bit) arithmetic via atoll().\n");
+    fprintf(out, " * It does NOT handle full 254-bit field element coefficients.\n");
+    fprintf(out, " * Use the JSON output for production verification.\n");
     fprintf(out, " */\n\n");
 
     fprintf(out, "#include <stdio.h>\n");
@@ -1317,15 +1346,15 @@ void r1cs_generate_c_checker(FILE *out, const char *circuit_name) {
     }
     fprintf(out, "};\n\n");
 
-    /* Build dense matrices */
+    /* Build dense matrices - coefficients converted via atoll() (64-bit precision limit) */
     fprintf(out, "/* A matrix (sparse entries only) */\n");
     fprintf(out, "/* Format: {row, col, val} */\n");
-    fprintf(out, "static const int A_entries[][3] = {\n");
+    fprintf(out, "static const long long A_entries[][3] = {\n");
     int a_count = 0;
     for (int i = 0; i < n_cons; i++) {
         r1cs_constraint_t *c = &r1cs.constraints[i];
         for (int j = 0; j < c->A_count; j++) {
-            fprintf(out, "    {%d, %d, %d}", i, c->A[j].col, c->A[j].coeff);
+            fprintf(out, "    {%d, %d, %sLL}", i, c->A[j].col, c->A[j].coeff);
             a_count++;
             if (i < n_cons - 1 || j < c->A_count - 1) fprintf(out, ",");
             fprintf(out, "\n");
@@ -1336,12 +1365,12 @@ void r1cs_generate_c_checker(FILE *out, const char *circuit_name) {
     fprintf(out, "#define A_ENTRIES %d\n\n", a_count > 0 ? a_count : 1);
 
     fprintf(out, "/* B matrix (sparse entries only) */\n");
-    fprintf(out, "static const int B_entries[][3] = {\n");
+    fprintf(out, "static const long long B_entries[][3] = {\n");
     int b_count = 0;
     for (int i = 0; i < n_cons; i++) {
         r1cs_constraint_t *c = &r1cs.constraints[i];
         for (int j = 0; j < c->B_count; j++) {
-            fprintf(out, "    {%d, %d, %d}", i, c->B[j].col, c->B[j].coeff);
+            fprintf(out, "    {%d, %d, %sLL}", i, c->B[j].col, c->B[j].coeff);
             b_count++;
             if (i < n_cons - 1 || j < c->B_count - 1) fprintf(out, ",");
             fprintf(out, "\n");
@@ -1352,12 +1381,12 @@ void r1cs_generate_c_checker(FILE *out, const char *circuit_name) {
     fprintf(out, "#define B_ENTRIES %d\n\n", b_count > 0 ? b_count : 1);
 
     fprintf(out, "/* C matrix (sparse entries only) */\n");
-    fprintf(out, "static const int C_entries[][3] = {\n");
+    fprintf(out, "static const long long C_entries[][3] = {\n");
     int c_count = 0;
     for (int i = 0; i < n_cons; i++) {
         r1cs_constraint_t *c = &r1cs.constraints[i];
         for (int j = 0; j < c->C_count; j++) {
-            fprintf(out, "    {%d, %d, %d}", i, c->C[j].col, c->C[j].coeff);
+            fprintf(out, "    {%d, %d, %sLL}", i, c->C[j].col, c->C[j].coeff);
             c_count++;
             if (i < n_cons - 1 || j < c->C_count - 1) fprintf(out, ",");
             fprintf(out, "\n");
@@ -1380,12 +1409,12 @@ void r1cs_generate_c_checker(FILE *out, const char *circuit_name) {
 
     /* Sparse matrix-vector multiplication */
     fprintf(out, "/* Compute sparse matrix-vector product: result[row] += coeff * w[col] */\n");
-    fprintf(out, "static void sparse_mv(long long *result, const int entries[][3], int n_entries, const long long *w) {\n");
+    fprintf(out, "static void sparse_mv(long long *result, const long long entries[][3], int n_entries, const long long *w) {\n");
     fprintf(out, "    for (int i = 0; i < n_entries; i++) {\n");
-    fprintf(out, "        int row = entries[i][0];\n");
-    fprintf(out, "        int col = entries[i][1];\n");
-    fprintf(out, "        int val = entries[i][2];\n");
-    fprintf(out, "        if (row >= 0) result[row] += (long long)val * w[col];\n");
+    fprintf(out, "        long long row = entries[i][0];\n");
+    fprintf(out, "        long long col = entries[i][1];\n");
+    fprintf(out, "        long long val = entries[i][2];\n");
+    fprintf(out, "        if (row >= 0) result[row] += val * w[col];\n");
     fprintf(out, "    }\n");
     fprintf(out, "}\n\n");
 
@@ -1499,21 +1528,21 @@ void r1cs_print(void) {
 
         printf("  A = [");
         for (int j = 0; j < c->A_count; j++) {
-            printf("(%d:%d)", c->A[j].col, c->A[j].coeff);
+            printf("(%d:%s)", c->A[j].col, c->A[j].coeff);
             if (j < c->A_count - 1) printf(", ");
         }
         printf("]\n");
 
         printf("  B = [");
         for (int j = 0; j < c->B_count; j++) {
-            printf("(%d:%d)", c->B[j].col, c->B[j].coeff);
+            printf("(%d:%s)", c->B[j].col, c->B[j].coeff);
             if (j < c->B_count - 1) printf(", ");
         }
         printf("]\n");
 
         printf("  C = [");
         for (int j = 0; j < c->C_count; j++) {
-            printf("(%d:%d)", c->C[j].col, c->C[j].coeff);
+            printf("(%d:%s)", c->C[j].col, c->C[j].coeff);
             if (j < c->C_count - 1) printf(", ");
         }
         printf("]\n\n");
@@ -1537,10 +1566,10 @@ expr_node_t *expr_create_array(const char *name, int index) {
     return node;
 }
 
-expr_node_t *expr_create_const(int value) {
+expr_node_t *expr_create_const(const char *value) {
     expr_node_t *node = (expr_node_t *)malloc(sizeof(expr_node_t));
     node->type = EXPR_CONST;
-    node->data.const_val = value;
+    node->data.const_val = strdup(value);
     return node;
 }
 
@@ -1561,6 +1590,9 @@ void expr_free(expr_node_t *node) {
             break;
         case EXPR_ARRAY_ACCESS:
             free(node->data.array_access.array_name);
+            break;
+        case EXPR_CONST:
+            free(node->data.const_val);
             break;
         case EXPR_ADD:
         case EXPR_SUB:
@@ -1591,8 +1623,7 @@ char *expr_to_string(expr_node_t *node) {
             return strdup(buf);
 
         case EXPR_CONST:
-            snprintf(buf, sizeof(buf), "%d", node->data.const_val);
-            return strdup(buf);
+            return strdup(node->data.const_val);
 
         case EXPR_ADD:
         case EXPR_SUB:
