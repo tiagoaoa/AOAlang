@@ -7,6 +7,10 @@
 #include <string.h>
 #include <errno.h>
 #include "flattener.h"
+#include "poseidon_lib.h"
+
+/* Counter for unique Poseidon instance prefixes */
+static int poseidon_instance_counter = 0;
 
 /* --- Helpers --- */
 
@@ -494,12 +498,41 @@ static const char *flatten_expr(flattener_t *f, expr_t *e, const char *prefix,
     }
 
     case EXPR_CALL: {
+        /* Try compile-time evaluation first */
         long long val;
         if (eval_const(f, e, &val)) {
             snprintf(result_buf, MAX_NAME_LEN, "%lld", val);
             return result_buf;
         }
-        fprintf(stderr, "Flattener: cannot evaluate function call at runtime\n");
+
+        /* Check for library function: Poseidon(x, salt) or Poseidon(x) */
+        if (strcmp(e->u.call.name, "Poseidon") == 0) {
+            if (e->u.call.nargs < 1 || e->u.call.nargs > 2) {
+                fprintf(stderr, "Poseidon() requires 1 or 2 arguments\n");
+                strcpy(result_buf, "ERROR");
+                return result_buf;
+            }
+            /* Flatten arguments */
+            char arg0_buf[MAX_NAME_LEN], arg1_buf[MAX_NAME_LEN];
+            const char *arg0 = flatten_expr(f, e->u.call.args[0], prefix, NULL, arg0_buf);
+            const char *arg1;
+            if (e->u.call.nargs == 2) {
+                arg1 = flatten_expr(f, e->u.call.args[1], prefix, NULL, arg1_buf);
+            } else {
+                arg1 = "0";  /* Poseidon(x) → Poseidon(x, 0) */
+            }
+
+            /* Generate unique prefix for this instance */
+            char inst_prefix[MAX_NAME_LEN];
+            snprintf(inst_prefix, MAX_NAME_LEN, "%spos%d_",
+                     prefix, poseidon_instance_counter++);
+
+            /* Expand inline */
+            poseidon_expand(f, inst_prefix, arg0, arg1, result_buf);
+            return result_buf;
+        }
+
+        fprintf(stderr, "Flattener: unknown runtime function '%s'\n", e->u.call.name);
         strcpy(result_buf, "ERROR");
         return result_buf;
     }
