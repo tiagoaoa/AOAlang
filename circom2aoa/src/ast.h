@@ -40,7 +40,7 @@ typedef struct expr expr_t;
 struct expr {
     expr_type_t type;
     union {
-        long long number;                          /* EXPR_NUMBER */
+        char numstr[80];                           /* EXPR_NUMBER (string to preserve precision) */
         char name[MAX_NAME_LEN];                   /* EXPR_IDENT */
         struct { char name[MAX_NAME_LEN]; expr_t *index; } array;  /* EXPR_ARRAY_ACCESS */
         struct { char comp[MAX_NAME_LEN]; char field[MAX_NAME_LEN]; } comp_access; /* EXPR_COMPONENT_ACCESS */
@@ -196,7 +196,7 @@ typedef struct {
 
 
 /* Allocators */
-expr_t *expr_number(long long val);
+expr_t *expr_number(const char *val);
 expr_t *expr_ident(const char *name);
 expr_t *expr_array_access(const char *name, expr_t *index);
 expr_t *expr_component_access(const char *comp, const char *field);

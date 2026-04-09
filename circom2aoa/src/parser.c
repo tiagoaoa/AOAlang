@@ -52,7 +52,7 @@ static stmt_t **parse_statement_list(parser_t *p, int *count);
 static expr_t *parse_primary(parser_t *p) {
     if (at(p, TOK_NUMBER)) {
         token_t *t = advance(p);
-        return expr_number(atoll(t->value));
+        return expr_number(t->value);  /* Pass string directly, no conversion */
     }
 
     if (at(p, TOK_IDENT)) {
@@ -434,7 +434,7 @@ static stmt_t *parse_for_init(parser_t *p) {
     stmt_t *s = stmt_alloc(STMT_VAR_ASSIGN);
     s->u.var_assign.target = e;
     s->u.var_assign.op = ASGN_EQ;
-    s->u.var_assign.value = expr_number(0);
+    s->u.var_assign.value = expr_number("0");
     return s;
 }
 
@@ -448,7 +448,7 @@ static stmt_t *parse_for_update(parser_t *p) {
         stmt_t *s = stmt_alloc(STMT_VAR_ASSIGN);
         s->u.var_assign.target = e;
         s->u.var_assign.op = ASGN_PLUS_EQ;
-        s->u.var_assign.value = expr_number(1);
+        s->u.var_assign.value = expr_number("1");
         return s;
     }
     if (at(p, TOK_DECREMENT)) {
@@ -456,7 +456,7 @@ static stmt_t *parse_for_update(parser_t *p) {
         stmt_t *s = stmt_alloc(STMT_VAR_ASSIGN);
         s->u.var_assign.target = e;
         s->u.var_assign.op = ASGN_MINUS_EQ;
-        s->u.var_assign.value = expr_number(1);
+        s->u.var_assign.value = expr_number("1");
         return s;
     }
 
@@ -470,7 +470,7 @@ static stmt_t *parse_for_update(parser_t *p) {
         stmt_t *s = stmt_alloc(STMT_VAR_ASSIGN);
         s->u.var_assign.target = e;
         s->u.var_assign.op = ASGN_EQ;
-        s->u.var_assign.value = expr_number(0);
+        s->u.var_assign.value = expr_number("0");
         return s;
     }
     expr_t *val = parse_expression(p);
@@ -629,7 +629,7 @@ static stmt_t *parse_expression_stmt(parser_t *p) {
     stmt_t *s = stmt_alloc(STMT_VAR_ASSIGN);
     s->u.var_assign.target = e;
     s->u.var_assign.op = ASGN_EQ;
-    s->u.var_assign.value = expr_number(0);
+    s->u.var_assign.value = expr_number("0");
     return s;
 }
 

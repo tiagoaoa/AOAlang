@@ -7,10 +7,11 @@
 #include <string.h>
 #include "ast.h"
 
-expr_t *expr_number(long long val) {
+expr_t *expr_number(const char *val) {
     expr_t *e = calloc(1, sizeof(expr_t));
     e->type = EXPR_NUMBER;
-    e->u.number = val;
+    strncpy(e->u.numstr, val, 79);
+    e->u.numstr[79] = '\0';
     return e;
 }
 

@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 #include "flattener.h"
 
 /* --- Helpers --- */
@@ -121,6 +122,27 @@ static void ct_set_runtime(flattener_t *f, const char *name, const char *gate_na
     }
 }
 
+/* Set a var to a big string constant (doesn't fit in long long) */
+static void ct_set_big(flattener_t *f, const char *name, const char *bigval) {
+    for (int i = 0; i < f->nvars; i++) {
+        if (strcmp(f->vars[i].name, name) == 0) {
+            f->vars[i].is_big = 1;
+            f->vars[i].is_runtime = 0;
+            strncpy(f->vars[i].bigvalue, bigval, 79);
+            f->vars[i].bigvalue[79] = '\0';
+            return;
+        }
+    }
+    if (f->nvars < MAX_VARS) {
+        memset(&f->vars[f->nvars], 0, sizeof(ct_var_t));
+        strncpy(f->vars[f->nvars].name, name, MAX_NAME_LEN - 1);
+        f->vars[f->nvars].is_big = 1;
+        strncpy(f->vars[f->nvars].bigvalue, bigval, 79);
+        f->vars[f->nvars].bigvalue[79] = '\0';
+        f->nvars++;
+    }
+}
+
 /* Signal lookup */
 static signal_info_t *signal_lookup(flattener_t *f, const char *name) {
     for (int i = 0; i < f->nsignals; i++)
@@ -151,9 +173,17 @@ static int eval_const(flattener_t *f, expr_t *e, long long *out) {
     if (!e) return 0;
 
     switch (e->type) {
-    case EXPR_NUMBER:
-        *out = e->u.number;
+    case EXPR_NUMBER: {
+        /* Try to parse as long long; fail gracefully for overflow */
+        char *endptr;
+        errno = 0;
+        long long val = strtoll(e->u.numstr, &endptr, 10);
+        if (errno == ERANGE || *endptr != '\0') {
+            return 0;  /* Number too large for long long */
+        }
+        *out = val;
         return 1;
+    }
 
     case EXPR_IDENT:
         return ct_lookup(f, e->u.name, out);
@@ -233,9 +263,17 @@ static const char *flatten_expr(flattener_t *f, expr_t *e, const char *prefix,
     if (!e) { strcpy(result_buf, "0"); return result_buf; }
 
     switch (e->type) {
-    case EXPR_NUMBER:
-        snprintf(result_buf, MAX_NAME_LEN, "%lld", e->u.number);
+    case EXPR_NUMBER: {
+        long long val;
+        if (eval_const(f, e, &val)) {
+            snprintf(result_buf, MAX_NAME_LEN, "%lld", val);
+        } else {
+            /* Big number: emit the string directly */
+            strncpy(result_buf, e->u.numstr, MAX_NAME_LEN - 1);
+            result_buf[MAX_NAME_LEN - 1] = '\0';
+        }
         return result_buf;
+    }
 
     case EXPR_IDENT: {
         /* Check runtime var alias first */
@@ -247,6 +285,13 @@ static const char *flatten_expr(flattener_t *f, expr_t *e, const char *prefix,
         long long val;
         if (ct_lookup(f, e->u.name, &val)) {
             snprintf(result_buf, MAX_NAME_LEN, "%lld", val);
+            return result_buf;
+        }
+        /* Check if it's a big compile-time var */
+        ct_var_t *var = ct_find(f, e->u.name);
+        if (var && var->is_big) {
+            strncpy(result_buf, var->bigvalue, MAX_NAME_LEN - 1);
+            result_buf[MAX_NAME_LEN - 1] = '\0';
             return result_buf;
         }
         /* Try prefixed signal */
@@ -602,9 +647,18 @@ static void handle_signal_decl(flattener_t *f, stmt_t *s, const char *prefix,
 static void handle_var_decl(flattener_t *f, stmt_t *s) {
     for (int i = 0; i < s->u.var_decl.count; i++) {
         long long val = 0;
-        if (s->u.var_decl.inits[i])
-            eval_const(f, s->u.var_decl.inits[i], &val);
-        ct_set(f, s->u.var_decl.names[i], val);
+        if (s->u.var_decl.inits[i]) {
+            if (eval_const(f, s->u.var_decl.inits[i], &val)) {
+                ct_set(f, s->u.var_decl.names[i], val);
+            } else if (s->u.var_decl.inits[i]->type == EXPR_NUMBER) {
+                /* Big number literal: store as big string value */
+                ct_set_big(f, s->u.var_decl.names[i], s->u.var_decl.inits[i]->u.numstr);
+            } else {
+                ct_set(f, s->u.var_decl.names[i], 0);
+            }
+        } else {
+            ct_set(f, s->u.var_decl.names[i], 0);
+        }
     }
 }
 
@@ -666,6 +720,13 @@ static void handle_var_assign(flattener_t *f, stmt_t *s, const char *prefix,
     long long val;
     if (s->u.var_assign.op == ASGN_EQ && eval_const(f, s->u.var_assign.value, &val)) {
         ct_set(f, target_name, val);
+        return;
+    }
+
+    /* Check for big number literal assignment: var X = BIG_NUMBER */
+    if (s->u.var_assign.op == ASGN_EQ && s->u.var_assign.value &&
+        s->u.var_assign.value->type == EXPR_NUMBER) {
+        ct_set_big(f, target_name, s->u.var_assign.value->u.numstr);
         return;
     }
 

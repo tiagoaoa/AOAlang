@@ -34,6 +34,8 @@ typedef struct {
 typedef struct {
     char name[MAX_NAME_LEN];
     long long value;
+    char bigvalue[80];             /* string value for large constants that overflow long long */
+    int is_big;                    /* 1 if value doesn't fit in long long */
     int is_runtime;                /* 1 if var holds a gate variable name, not a constant */
     char runtime_name[MAX_NAME_LEN]; /* gate variable name when is_runtime=1 */
 } ct_var_t;
