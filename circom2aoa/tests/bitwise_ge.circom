@@ -20,10 +20,12 @@ template Num2Bits(n) {
 template GreaterEqThan(nbits) {
     signal input a;
     signal input b;
+    signal output out;
 
     component n2b = Num2Bits(nbits + 1);
     n2b.in <== a - b + (1 << nbits);
 
+    out <== n2b.out[nbits];
     n2b.out[nbits] === 1;
 }
 

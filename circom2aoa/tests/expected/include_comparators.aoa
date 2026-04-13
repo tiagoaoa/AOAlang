@@ -1,5 +1,5 @@
 decl private a, n2b_out_0, n2b_out_1, n2b_out_2, n2b_out_3, n2b_out_4
-decl deferred b
+decl deferred b, out
 
 t0 = a - b
 n2b_in = t0 + 16
@@ -28,4 +28,6 @@ chk4 = t18 == 0
 t19 = n2b_out_4 * 16
 t20 = t16 + t19
 chk5 = t20 == n2b_in
+computedout = n2b_out_4
+outcheckout = computedout == out
 chk6 = n2b_out_4 == 1
