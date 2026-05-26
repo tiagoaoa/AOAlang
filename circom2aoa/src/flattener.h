@@ -10,8 +10,8 @@
 
 #include "ast.h"
 
-#define MAX_OPS    16384
-#define MAX_VARS    4096
+#define MAX_OPS    65536
+#define MAX_VARS   16384
 
 /* A single flat AOA operation */
 typedef struct {
@@ -45,6 +45,8 @@ typedef struct {
     char name[MAX_NAME_LEN];
     char prefix[MAX_NAME_LEN];
     int template_idx;       /* index into program_t.templates */
+    long long param_values[MAX_PARAMS];
+    int nparams;
     int flattened;          /* 1 if body already flattened */
 } comp_inst_t;
 
@@ -71,9 +73,12 @@ typedef struct {
     /* Track assigned gate variables */
     char assigned[MAX_VARS][MAX_NAME_LEN];
     int nassigned;
+
+    int overflowed;
 } flattener_t;
 
 void flattener_init(flattener_t *f, program_t *prog, int verbose);
 int  flattener_run(flattener_t *f);  /* returns 0 on success */
+void flattener_record_overflow(flattener_t *f, const char *kind, int limit);
 
 #endif /* FLATTENER_H */

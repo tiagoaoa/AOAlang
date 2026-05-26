@@ -10,7 +10,7 @@
 /* Maximum limits */
 #define MAX_PARAMS     16
 #define MAX_CHILDREN  256
-#define MAX_SIGNALS  4096
+#define MAX_SIGNALS 16384
 #define MAX_TEMPLATES  64
 #define MAX_NAME_LEN  256
 

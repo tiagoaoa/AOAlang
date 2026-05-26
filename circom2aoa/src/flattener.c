@@ -14,10 +14,17 @@ static int poseidon_instance_counter = 0;
 
 /* --- Helpers --- */
 
+void flattener_record_overflow(flattener_t *f, const char *kind, int limit) {
+    if (!f->overflowed) {
+        fprintf(stderr, "Flattener: %s limit exceeded (%d)\n", kind, limit);
+    }
+    f->overflowed = 1;
+}
+
 static void add_op(flattener_t *f, const char *target, char op,
                    const char *left, const char *right) {
     if (f->nops >= MAX_OPS) {
-        fprintf(stderr, "Flattener: too many operations\n");
+        flattener_record_overflow(f, "operation", MAX_OPS);
         return;
     }
     flat_op_t *o = &f->ops[f->nops++];
@@ -30,7 +37,10 @@ static void add_op(flattener_t *f, const char *target, char op,
 }
 
 static void add_comment(flattener_t *f, const char *comment) {
-    if (f->nops >= MAX_OPS) return;
+    if (f->nops >= MAX_OPS) {
+        flattener_record_overflow(f, "operation", MAX_OPS);
+        return;
+    }
     flat_op_t *o = &f->ops[f->nops++];
     o->target[0] = '\0';
     o->op = '#';
@@ -49,11 +59,24 @@ static char *fresh_check(flattener_t *f, char *buf) {
     return buf;
 }
 
+static void prefixed_name(const char *prefix, const char *name, char *out) {
+    if (prefix[0]) snprintf(out, MAX_NAME_LEN, "%s%s", prefix, name);
+    else strncpy(out, name, MAX_NAME_LEN - 1);
+    out[MAX_NAME_LEN - 1] = '\0';
+}
+
+static void array_elem_name(const char *base, long long idx, char *out) {
+    snprintf(out, MAX_NAME_LEN, "%s[%lld]", base, idx);
+}
+
 static void mark_assigned(flattener_t *f, const char *name) {
     for (int i = 0; i < f->nassigned; i++)
         if (strcmp(f->assigned[i], name) == 0) return;
-    if (f->nassigned < MAX_VARS)
-        strncpy(f->assigned[f->nassigned++], name, MAX_NAME_LEN - 1);
+    if (f->nassigned >= MAX_VARS) {
+        flattener_record_overflow(f, "assigned variable", MAX_VARS);
+        return;
+    }
+    strncpy(f->assigned[f->nassigned++], name, MAX_NAME_LEN - 1);
 }
 
 static int is_assigned(flattener_t *f, const char *name) {
@@ -105,7 +128,9 @@ static void ct_set(flattener_t *f, const char *name, long long val) {
         strncpy(f->vars[f->nvars].name, name, MAX_NAME_LEN - 1);
         f->vars[f->nvars].value = val;
         f->nvars++;
+        return;
     }
+    flattener_record_overflow(f, "variable", MAX_VARS);
 }
 
 /* Set a var to be a runtime alias for a gate variable */
@@ -123,7 +148,9 @@ static void ct_set_runtime(flattener_t *f, const char *name, const char *gate_na
         f->vars[f->nvars].is_runtime = 1;
         strncpy(f->vars[f->nvars].runtime_name, gate_name, MAX_NAME_LEN - 1);
         f->nvars++;
+        return;
     }
+    flattener_record_overflow(f, "variable", MAX_VARS);
 }
 
 /* Set a var to a big string constant (doesn't fit in long long) */
@@ -144,7 +171,9 @@ static void ct_set_big(flattener_t *f, const char *name, const char *bigval) {
         strncpy(f->vars[f->nvars].bigvalue, bigval, 79);
         f->vars[f->nvars].bigvalue[79] = '\0';
         f->nvars++;
+        return;
     }
+    flattener_record_overflow(f, "variable", MAX_VARS);
 }
 
 /* Signal lookup */
@@ -155,7 +184,10 @@ static signal_info_t *signal_lookup(flattener_t *f, const char *name) {
 }
 
 static void signal_add(flattener_t *f, const char *name, int dir, int is_public, int size) {
-    if (f->nsignals >= MAX_SIGNALS) return;
+    if (f->nsignals >= MAX_SIGNALS) {
+        flattener_record_overflow(f, "signal", MAX_SIGNALS);
+        return;
+    }
     signal_info_t *s = &f->signals[f->nsignals++];
     strncpy(s->name, name, MAX_NAME_LEN - 1);
     s->direction = dir;
@@ -169,6 +201,156 @@ static template_t *template_lookup(flattener_t *f, const char *name) {
         if (strcmp(f->prog->templates[i].name, name) == 0)
             return &f->prog->templates[i];
     return NULL;
+}
+
+static int is_public_name(const char *name, const char **public_set, int npublic) {
+    for (int i = 0; i < npublic; i++) {
+        if (strcmp(name, public_set[i]) == 0) return 1;
+    }
+    return 0;
+}
+
+static void add_boolean_constraint(flattener_t *f, const char *var) {
+    char minus_one[MAX_NAME_LEN], product[MAX_NAME_LEN], check[MAX_NAME_LEN];
+    fresh_temp(f, minus_one);
+    add_op(f, minus_one, '-', var, "1");
+    mark_assigned(f, minus_one);
+
+    fresh_temp(f, product);
+    add_op(f, product, '*', var, minus_one);
+    mark_assigned(f, product);
+
+    fresh_check(f, check);
+    add_op(f, check, 'E', product, "0");
+}
+
+static void add_horner_reconstruction(flattener_t *f, const char *bits_name,
+                                      long long nbits, const char *value_name) {
+    char bit_var[MAX_NAME_LEN];
+    char acc[MAX_NAME_LEN], dbl[MAX_NAME_LEN], next[MAX_NAME_LEN], check[MAX_NAME_LEN];
+
+    if (nbits <= 0) {
+        fresh_check(f, check);
+        add_op(f, check, 'E', "0", value_name);
+        return;
+    }
+
+    array_elem_name(bits_name, nbits - 1, bit_var);
+    strncpy(acc, bit_var, MAX_NAME_LEN - 1);
+    acc[MAX_NAME_LEN - 1] = '\0';
+
+    for (long long i = nbits - 2; i >= 0; i--) {
+        fresh_temp(f, dbl);
+        add_op(f, dbl, '+', acc, acc);
+        mark_assigned(f, dbl);
+
+        array_elem_name(bits_name, i, bit_var);
+        fresh_temp(f, next);
+        add_op(f, next, '+', dbl, bit_var);
+        mark_assigned(f, next);
+
+        strncpy(acc, next, MAX_NAME_LEN - 1);
+        acc[MAX_NAME_LEN - 1] = '\0';
+    }
+
+    fresh_check(f, check);
+    add_op(f, check, 'E', acc, value_name);
+}
+
+static void emit_greater_eq_than(flattener_t *f, const char *prefix,
+                                 const char **public_set, int npublic,
+                                 long long nbits) {
+    char a_name[MAX_NAME_LEN], b_name[MAX_NAME_LEN], out_name[MAX_NAME_LEN];
+    char a_bits[MAX_NAME_LEN], b_bits[MAX_NAME_LEN], diff_bits[MAX_NAME_LEN];
+    char borrow_bits[MAX_NAME_LEN], no_borrow[MAX_NAME_LEN];
+
+    prefixed_name(prefix, "a", a_name);
+    prefixed_name(prefix, "b", b_name);
+    prefixed_name(prefix, "out", out_name);
+    prefixed_name(prefix, "a_bits", a_bits);
+    prefixed_name(prefix, "b_bits", b_bits);
+    prefixed_name(prefix, "diff_bits", diff_bits);
+    prefixed_name(prefix, "borrow_bits", borrow_bits);
+    prefixed_name(prefix, "no_borrow", no_borrow);
+
+    if (prefix[0] == '\0') {
+        signal_add(f, a_name, 1, is_public_name("a", public_set, npublic), 0);
+        signal_add(f, b_name, 1, is_public_name("b", public_set, npublic), 0);
+        signal_add(f, out_name, 2, 1, 0);
+    }
+
+    signal_add(f, a_bits, 1, 0, (int)nbits);
+    signal_add(f, b_bits, 1, 0, (int)nbits);
+    signal_add(f, diff_bits, 1, 0, (int)nbits);
+    signal_add(f, borrow_bits, 1, 0, (int)nbits);
+    signal_add(f, no_borrow, 1, 0, 0);
+
+    for (long long i = 0; i < nbits; i++) {
+        char bit_name[MAX_NAME_LEN];
+
+        array_elem_name(a_bits, i, bit_name);
+        add_boolean_constraint(f, bit_name);
+
+        array_elem_name(b_bits, i, bit_name);
+        add_boolean_constraint(f, bit_name);
+
+        array_elem_name(diff_bits, i, bit_name);
+        add_boolean_constraint(f, bit_name);
+
+        array_elem_name(borrow_bits, i, bit_name);
+        add_boolean_constraint(f, bit_name);
+    }
+
+    add_horner_reconstruction(f, a_bits, nbits, a_name);
+    add_horner_reconstruction(f, b_bits, nbits, b_name);
+
+    for (long long i = 0; i < nbits; i++) {
+        char a_bit[MAX_NAME_LEN], b_bit[MAX_NAME_LEN], diff_bit[MAX_NAME_LEN];
+        char borrow_bit[MAX_NAME_LEN], prev_borrow[MAX_NAME_LEN];
+        char raw_diff[MAX_NAME_LEN], adjusted[MAX_NAME_LEN];
+        char borrow_doubled[MAX_NAME_LEN], sum[MAX_NAME_LEN], check[MAX_NAME_LEN];
+
+        array_elem_name(a_bits, i, a_bit);
+        array_elem_name(b_bits, i, b_bit);
+        array_elem_name(diff_bits, i, diff_bit);
+        array_elem_name(borrow_bits, i, borrow_bit);
+
+        fresh_temp(f, raw_diff);
+        add_op(f, raw_diff, '-', a_bit, b_bit);
+        mark_assigned(f, raw_diff);
+
+        strncpy(adjusted, raw_diff, MAX_NAME_LEN - 1);
+        adjusted[MAX_NAME_LEN - 1] = '\0';
+        if (i > 0) {
+            array_elem_name(borrow_bits, i - 1, prev_borrow);
+            fresh_temp(f, adjusted);
+            add_op(f, adjusted, '-', raw_diff, prev_borrow);
+            mark_assigned(f, adjusted);
+        }
+
+        fresh_temp(f, borrow_doubled);
+        add_op(f, borrow_doubled, '+', borrow_bit, borrow_bit);
+        mark_assigned(f, borrow_doubled);
+
+        fresh_temp(f, sum);
+        add_op(f, sum, '+', diff_bit, borrow_doubled);
+        mark_assigned(f, sum);
+
+        fresh_check(f, check);
+        add_op(f, check, 'E', adjusted, sum);
+    }
+
+    if (nbits > 0) {
+        char last_borrow[MAX_NAME_LEN];
+        array_elem_name(borrow_bits, nbits - 1, last_borrow);
+        add_op(f, no_borrow, '-', "1", last_borrow);
+    } else {
+        add_op(f, no_borrow, 'I', "1", NULL);
+    }
+    mark_assigned(f, no_borrow);
+
+    add_op(f, out_name, 'I', no_borrow, NULL);
+    mark_assigned(f, out_name);
 }
 
 /* --- Compile-time expression evaluator --- */
@@ -616,9 +798,16 @@ static void flush_component(flattener_t *f, const char *comp_name, const char *p
     for (int i = 0; i < f->ncomps; i++) {
         if (strcmp(f->comps[i].name, comp_name) == 0 && !f->comps[i].flattened) {
             f->comps[i].flattened = 1;
-            template_t *tmpl = &f->prog->templates[f->comps[i].template_idx];
+            comp_inst_t *ci = &f->comps[i];
+            template_t *tmpl = &f->prog->templates[ci->template_idx];
+            for (int p = 0; p < ci->nparams && p < tmpl->nparams; p++)
+                ct_set(f, tmpl->params[p], ci->param_values[p]);
+            if (strcmp(tmpl->name, "GreaterEqThan") == 0 && ci->nparams >= 1) {
+                emit_greater_eq_than(f, ci->prefix, NULL, 0, ci->param_values[0]);
+                return;
+            }
             for (int j = 0; j < tmpl->nbody; j++) {
-                flatten_stmt(f, tmpl->body[j], f->comps[i].prefix, NULL, 0);
+                flatten_stmt(f, tmpl->body[j], ci->prefix, NULL, 0);
             }
             return;
         }
@@ -630,9 +819,16 @@ static void flush_component(flattener_t *f, const char *comp_name, const char *p
     for (int i = 0; i < f->ncomps; i++) {
         if (strcmp(f->comps[i].name, full_name) == 0 && !f->comps[i].flattened) {
             f->comps[i].flattened = 1;
-            template_t *tmpl = &f->prog->templates[f->comps[i].template_idx];
+            comp_inst_t *ci = &f->comps[i];
+            template_t *tmpl = &f->prog->templates[ci->template_idx];
+            for (int p = 0; p < ci->nparams && p < tmpl->nparams; p++)
+                ct_set(f, tmpl->params[p], ci->param_values[p]);
+            if (strcmp(tmpl->name, "GreaterEqThan") == 0 && ci->nparams >= 1) {
+                emit_greater_eq_than(f, ci->prefix, NULL, 0, ci->param_values[0]);
+                return;
+            }
             for (int j = 0; j < tmpl->nbody; j++) {
-                flatten_stmt(f, tmpl->body[j], f->comps[i].prefix, NULL, 0);
+                flatten_stmt(f, tmpl->body[j], ci->prefix, NULL, 0);
             }
             return;
         }
@@ -724,6 +920,12 @@ static void handle_var_assign(flattener_t *f, stmt_t *s, const char *prefix,
                 strncpy(ci->name, comp_name, MAX_NAME_LEN - 1);
                 strncpy(ci->prefix, comp_prefix, MAX_NAME_LEN - 1);
                 ci->template_idx = (int)(tmpl - f->prog->templates);
+                ci->nparams = 0;
+                for (int i = 0; i < tmpl->nparams && i < s->u.var_assign.value->u.call.nargs; i++) {
+                    long long val = 0;
+                    eval_const(f, s->u.var_assign.value->u.call.args[i], &val);
+                    ci->param_values[ci->nparams++] = val;
+                }
                 ci->flattened = 0;
             }
             return;
@@ -1004,10 +1206,20 @@ int flattener_run(flattener_t *f) {
     for (int i = 0; i < mc->npublic; i++)
         public_set[i] = mc->public_inputs[i];
 
+    if (strcmp(tmpl->name, "GreaterEqThan") == 0) {
+        long long nbits = 0;
+        if (tmpl->nparams > 0 && !ct_lookup(f, tmpl->params[0], &nbits)) {
+            fprintf(stderr, "Flattener: GreaterEqThan requires constant bit width\n");
+            return 1;
+        }
+        emit_greater_eq_than(f, "", public_set, mc->npublic, nbits);
+        return f->overflowed ? 1 : 0;
+    }
+
     /* Flatten template body */
     for (int i = 0; i < tmpl->nbody; i++) {
         flatten_stmt(f, tmpl->body[i], "", public_set, mc->npublic);
     }
 
-    return 0;
+    return f->overflowed ? 1 : 0;
 }

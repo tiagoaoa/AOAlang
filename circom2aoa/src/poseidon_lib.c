@@ -15,7 +15,7 @@
 static void p_add_op(flattener_t *f, const char *target, char op,
                      const char *left, const char *right) {
     if (f->nops >= MAX_OPS) {
-        fprintf(stderr, "Poseidon: too many operations (limit %d)\n", MAX_OPS);
+        flattener_record_overflow(f, "operation", MAX_OPS);
         return;
     }
     flat_op_t *o = &f->ops[f->nops++];
