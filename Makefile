@@ -6,6 +6,7 @@ LEX = flex
 YACC = bison
 CFLAGS = -Wall -Wextra -g -O2
 LDFLAGS =
+DEPFLAGS = -MMD -MP
 
 # Directories
 SRCDIR = src
@@ -28,6 +29,7 @@ LEX_C = $(SRCDIR)/lex.yy.c
 # Object files
 OBJECTS = $(SRCDIR)/aoa.tab.o $(SRCDIR)/lex.yy.o \
           $(SRCDIR)/main.o $(SRCDIR)/symbol_table.o $(SRCDIR)/error.o $(SRCDIR)/r1cs.o
+DEPFILES = $(OBJECTS:.o=.d)
 
 # Default target
 all: $(TARGET)
@@ -46,15 +48,15 @@ $(LEX_C): $(LEX_SRC) $(YACC_H)
 
 # Compile generated parser
 $(SRCDIR)/aoa.tab.o: $(YACC_C)
-	$(CC) $(CFLAGS) -c -o $@ $(YACC_C)
+	$(CC) $(CFLAGS) $(DEPFLAGS) -c -o $@ $(YACC_C)
 
 # Compile generated lexer
 $(SRCDIR)/lex.yy.o: $(LEX_C)
-	$(CC) $(CFLAGS) -c -o $@ $(LEX_C)
+	$(CC) $(CFLAGS) $(DEPFLAGS) -c -o $@ $(LEX_C)
 
 # Compile other source files
 $(SRCDIR)/%.o: $(SRCDIR)/%.c
-	$(CC) $(CFLAGS) -c -o $@ $<
+	$(CC) $(CFLAGS) $(DEPFLAGS) -c -o $@ $<
 
 # Link everything together
 $(TARGET): $(BINDIR) $(OBJECTS)
@@ -190,7 +192,7 @@ uninstall:
 
 # Clean build artifacts
 clean:
-	rm -f $(OBJECTS) $(YACC_C) $(YACC_H) $(LEX_C)
+	rm -f $(OBJECTS) $(DEPFILES) $(YACC_C) $(YACC_H) $(LEX_C)
 	rm -f $(SRCDIR)/*.o
 	@echo "Cleaned build artifacts"
 
@@ -224,5 +226,7 @@ help:
 	@echo ""
 	@echo "Other Targets:"
 	@echo "  help          - Show this help message"
+
+-include $(DEPFILES)
 
 .PHONY: all test test-all test-errors test-generate test-dense test-qap test-checker install uninstall clean distclean help

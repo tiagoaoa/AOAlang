@@ -7,9 +7,9 @@
 
 #include "symbol_table.h"
 
-/* Maximum constraints and variables */
-#define MAX_CONSTRAINTS 4096
-#define MAX_VARIABLES 4096
+/* Initial dynamic capacities for constraints and variables */
+#define INITIAL_CONSTRAINT_CAPACITY 1024
+#define INITIAL_WITNESS_CAPACITY 1024
 #define MAX_ENTRIES_PER_ROW 64
 
 /* Sparse matrix entry */
@@ -70,24 +70,26 @@ typedef struct {
 
 /* R1CS system */
 typedef struct {
-    r1cs_constraint_t constraints[MAX_CONSTRAINTS];
+    r1cs_constraint_t *constraints;
     int n_constraints;
+    int constraints_capacity;
 
-    witness_entry_t witnesses[MAX_VARIABLES];
+    witness_entry_t *witnesses;
     int n_witnesses;
+    int witnesses_capacity;
 
     /* Partition info */
-    int constant_indices[MAX_VARIABLES];
+    int *constant_indices;
     int n_constants;
-    int private_indices[MAX_VARIABLES];
+    int *private_indices;
     int n_private;
-    int deferred_indices[MAX_VARIABLES];
+    int *deferred_indices;
     int n_deferred;
-    int gate_indices[MAX_VARIABLES];
+    int *gate_indices;
     int n_gates;
 
     /* Public input names for discriminants */
-    char *public_input_names[MAX_VARIABLES];
+    char **public_input_names;
     int n_public_inputs;
 } r1cs_system_t;
 

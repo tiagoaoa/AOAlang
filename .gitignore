@@ -5,6 +5,8 @@ aoac
 # Object files
 *.o
 *.obj
+src/*.d
+circom2aoa/src/*.d
 
 # Generated parser/lexer files
 src/aoa.tab.c

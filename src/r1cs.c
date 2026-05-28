@@ -15,6 +15,89 @@ r1cs_system_t r1cs;
 /* Current constraint being built */
 static int current_constraint = -1;
 
+static int grow_capacity(int current_capacity, int minimum_capacity, int initial_capacity) {
+    int new_capacity = current_capacity > 0 ? current_capacity : initial_capacity;
+    while (new_capacity < minimum_capacity) {
+        new_capacity *= 2;
+    }
+    return new_capacity;
+}
+
+static void *xrealloc_zero_tail(void *ptr, size_t old_count, size_t new_count, size_t elem_size) {
+    void *new_ptr = realloc(ptr, new_count * elem_size);
+    if (!new_ptr) {
+        fprintf(stderr, "Error: Out of memory while growing R1CS storage\n");
+        exit(1);
+    }
+
+    if (new_count > old_count) {
+        size_t old_size = old_count * elem_size;
+        size_t tail_size = (new_count - old_count) * elem_size;
+        memset((char *)new_ptr + old_size, 0, tail_size);
+    }
+
+    return new_ptr;
+}
+
+static void ensure_constraint_capacity(int minimum_capacity) {
+    if (minimum_capacity <= r1cs.constraints_capacity) return;
+
+    int old_capacity = r1cs.constraints_capacity;
+    int new_capacity = grow_capacity(old_capacity, minimum_capacity, INITIAL_CONSTRAINT_CAPACITY);
+    r1cs.constraints = xrealloc_zero_tail(
+        r1cs.constraints,
+        old_capacity,
+        new_capacity,
+        sizeof(r1cs_constraint_t)
+    );
+    r1cs.constraints_capacity = new_capacity;
+}
+
+static void ensure_witness_capacity(int minimum_capacity) {
+    if (minimum_capacity <= r1cs.witnesses_capacity) return;
+
+    int old_capacity = r1cs.witnesses_capacity;
+    int new_capacity = grow_capacity(old_capacity, minimum_capacity, INITIAL_WITNESS_CAPACITY);
+
+    r1cs.witnesses = xrealloc_zero_tail(
+        r1cs.witnesses,
+        old_capacity,
+        new_capacity,
+        sizeof(witness_entry_t)
+    );
+    r1cs.constant_indices = xrealloc_zero_tail(
+        r1cs.constant_indices,
+        old_capacity,
+        new_capacity,
+        sizeof(int)
+    );
+    r1cs.private_indices = xrealloc_zero_tail(
+        r1cs.private_indices,
+        old_capacity,
+        new_capacity,
+        sizeof(int)
+    );
+    r1cs.deferred_indices = xrealloc_zero_tail(
+        r1cs.deferred_indices,
+        old_capacity,
+        new_capacity,
+        sizeof(int)
+    );
+    r1cs.gate_indices = xrealloc_zero_tail(
+        r1cs.gate_indices,
+        old_capacity,
+        new_capacity,
+        sizeof(int)
+    );
+    r1cs.public_input_names = xrealloc_zero_tail(
+        r1cs.public_input_names,
+        old_capacity,
+        new_capacity,
+        sizeof(char *)
+    );
+    r1cs.witnesses_capacity = new_capacity;
+}
+
 void r1cs_init(void) {
     memset(&r1cs, 0, sizeof(r1cs_system_t));
     current_constraint = -1;
@@ -42,10 +125,19 @@ void r1cs_free(void) {
             free(r1cs.public_input_names[i]);
         }
     }
+    free(r1cs.constraints);
+    free(r1cs.witnesses);
+    free(r1cs.constant_indices);
+    free(r1cs.private_indices);
+    free(r1cs.deferred_indices);
+    free(r1cs.gate_indices);
+    free(r1cs.public_input_names);
     memset(&r1cs, 0, sizeof(r1cs_system_t));
 }
 
 void r1cs_add_constant_one(void) {
+    ensure_witness_capacity(1);
+
     /* Add constant "1" at index 0 */
     r1cs.witnesses[0].index = 0;
     r1cs.witnesses[0].name = strdup("1");
@@ -67,16 +159,14 @@ void r1cs_register_witness(const char *name, int witness_index,
                            visibility_t vis, symbol_origin_t origin,
                            symbol_type_t type, int array_size) {
     if (type == SYMBOL_ARRAY) {
+        ensure_witness_capacity(witness_index + array_size);
+
         /* Register each array element */
         for (int i = 0; i < array_size; i++) {
             char elem_name[256];
             snprintf(elem_name, sizeof(elem_name), "%s[%d]", name, i);
 
             int idx = witness_index + i;
-            if (idx >= MAX_VARIABLES) {
-                fprintf(stderr, "Error: Too many witness variables\n");
-                return;
-            }
 
             /* Ensure we have space */
             if (idx >= r1cs.n_witnesses) {
@@ -95,12 +185,9 @@ void r1cs_register_witness(const char *name, int witness_index,
             }
         }
     } else {
-        /* Register scalar */
-        if (witness_index >= MAX_VARIABLES) {
-            fprintf(stderr, "Error: Too many witness variables\n");
-            return;
-        }
+        ensure_witness_capacity(witness_index + 1);
 
+        /* Register scalar */
         if (witness_index >= r1cs.n_witnesses) {
             r1cs.n_witnesses = witness_index + 1;
         }
@@ -119,10 +206,7 @@ void r1cs_register_witness(const char *name, int witness_index,
 }
 
 void r1cs_begin_constraint(const char *lhs_var, const char *comment) {
-    if (r1cs.n_constraints >= MAX_CONSTRAINTS) {
-        fprintf(stderr, "Error: Too many constraints\n");
-        return;
-    }
+    ensure_constraint_capacity(r1cs.n_constraints + 1);
 
     current_constraint = r1cs.n_constraints;
     r1cs_constraint_t *c = &r1cs.constraints[current_constraint];
@@ -133,7 +217,7 @@ void r1cs_begin_constraint(const char *lhs_var, const char *comment) {
 }
 
 void r1cs_add_A(int col, const char *coeff) {
-    if (current_constraint < 0 || current_constraint >= MAX_CONSTRAINTS) return;
+    if (current_constraint < 0 || current_constraint >= r1cs.constraints_capacity) return;
     r1cs_constraint_t *c = &r1cs.constraints[current_constraint];
 
     if (c->A_count >= MAX_ENTRIES_PER_ROW) {
@@ -148,7 +232,7 @@ void r1cs_add_A(int col, const char *coeff) {
 }
 
 void r1cs_add_B(int col, const char *coeff) {
-    if (current_constraint < 0 || current_constraint >= MAX_CONSTRAINTS) return;
+    if (current_constraint < 0 || current_constraint >= r1cs.constraints_capacity) return;
     r1cs_constraint_t *c = &r1cs.constraints[current_constraint];
 
     if (c->B_count >= MAX_ENTRIES_PER_ROW) {
@@ -163,7 +247,7 @@ void r1cs_add_B(int col, const char *coeff) {
 }
 
 void r1cs_add_C(int col, const char *coeff) {
-    if (current_constraint < 0 || current_constraint >= MAX_CONSTRAINTS) return;
+    if (current_constraint < 0 || current_constraint >= r1cs.constraints_capacity) return;
     r1cs_constraint_t *c = &r1cs.constraints[current_constraint];
 
     if (c->C_count >= MAX_ENTRIES_PER_ROW) {
@@ -191,7 +275,7 @@ int r1cs_get_witness_index(const char *var_name) {
 
     if (strchr(var_name, '[') != NULL) {
         /* Parse array access */
-        char *bracket = strchr(var_name, '[');
+        const char *bracket = strchr(var_name, '[');
         size_t name_len = bracket - var_name;
         strncpy(name_buf, var_name, name_len);
         name_buf[name_len] = '\0';
@@ -721,6 +805,16 @@ void r1cs_generate_dense(FILE *out) {
  * Returns coefficients c[0..n-1] where P(x) = c[0] + c[1]*x + c[2]*x^2 + ...
  */
 static void lagrange_interpolate(int n, int *y, double *coeffs) {
+    double *basis = calloc(n, sizeof(double));
+    double *new_basis = calloc(n, sizeof(double));
+
+    if (!basis || !new_basis) {
+        fprintf(stderr, "Error: Out of memory during QAP interpolation\n");
+        free(basis);
+        free(new_basis);
+        return;
+    }
+
     /* Initialize coefficients to zero */
     for (int i = 0; i < n; i++) {
         coeffs[i] = 0.0;
@@ -735,7 +829,6 @@ static void lagrange_interpolate(int n, int *y, double *coeffs) {
         int xi = i + 1;  /* x-value for this point */
 
         /* Start with polynomial = y[i] (constant) */
-        double basis[MAX_CONSTRAINTS];
         for (int k = 0; k < n; k++) basis[k] = 0.0;
         basis[0] = (double)y[i];
 
@@ -748,7 +841,6 @@ static void lagrange_interpolate(int n, int *y, double *coeffs) {
             /* Multiply current polynomial by (x - xj) / denom */
             /* If P(x) = sum(basis[k] * x^k), then P(x) * (x - xj) =
                sum(basis[k] * x^(k+1)) - xj * sum(basis[k] * x^k) */
-            double new_basis[MAX_CONSTRAINTS];
             for (int k = 0; k < n; k++) new_basis[k] = 0.0;
 
             for (int k = 0; k < n; k++) {
@@ -769,6 +861,9 @@ static void lagrange_interpolate(int n, int *y, double *coeffs) {
             coeffs[k] += basis[k];
         }
     }
+
+    free(basis);
+    free(new_basis);
 }
 
 /* Helper to format a coefficient value, rounding near-integers */

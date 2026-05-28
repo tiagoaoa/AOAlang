@@ -3,6 +3,7 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -g -O2
 LDFLAGS =
+DEPFLAGS = -MMD -MP
 
 SRCDIR = src
 BINDIR = ../bin
@@ -13,6 +14,7 @@ TARGET = $(BINDIR)/circom2aoa
 SOURCES = $(SRCDIR)/main.c $(SRCDIR)/lexer.c $(SRCDIR)/ast.c $(SRCDIR)/parser.c \
           $(SRCDIR)/flattener.c $(SRCDIR)/emitter.c $(SRCDIR)/poseidon_lib.c
 OBJECTS = $(SOURCES:.c=.o)
+DEPFILES = $(OBJECTS:.o=.d)
 
 all: $(TARGET)
 
@@ -20,7 +22,7 @@ $(BINDIR):
 	mkdir -p $(BINDIR)
 
 $(SRCDIR)/%.o: $(SRCDIR)/%.c
-	$(CC) $(CFLAGS) -c -o $@ $<
+	$(CC) $(CFLAGS) $(DEPFLAGS) -c -o $@ $<
 
 $(TARGET): $(BINDIR) $(OBJECTS)
 	$(CC) $(CFLAGS) -o $@ $(OBJECTS) $(LDFLAGS)
@@ -64,9 +66,11 @@ test: $(TARGET)
 	if [ $$fail -ne 0 ]; then exit 1; fi
 
 clean:
-	rm -f $(OBJECTS)
+	rm -f $(OBJECTS) $(DEPFILES)
 
 distclean: clean
 	rm -f $(TARGET)
+
+-include $(DEPFILES)
 
 .PHONY: all test clean distclean
