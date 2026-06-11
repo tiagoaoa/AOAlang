@@ -1,0 +1,11 @@
+decl private isz_inv
+decl deferred in[2], out
+
+isz_in = in[1] - in[0]
+t0 = 0 - isz_in
+t1 = t0 * isz_inv
+isz_out = t1 + 1
+t2 = isz_in * isz_out
+chk0 = t2 == 0
+computedout = isz_out
+outcheckout = computedout == out

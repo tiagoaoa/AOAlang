@@ -1,0 +1,9 @@
+decl private inv
+decl deferred in, out
+
+t0 = 0 - in
+t1 = t0 * inv
+computedout = t1 + 1
+outcheckout = computedout == out
+t2 = in * out
+chk0 = t2 == 0

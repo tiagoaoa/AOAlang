@@ -2,7 +2,7 @@ decl private lt_n2b_out_0, lt_n2b_out_1, lt_n2b_out_2, lt_n2b_out_3, lt_n2b_out_
 decl deferred in[2], out
 
 lt_in_0 = in[1]
-lt_in_1 = in[0] + 1
+lt_in_1 = in[0]
 t0 = lt_in_0 + 16
 lt_n2b_in = t0 - lt_in_1
 t1 = lt_n2b_out_0 - 1
