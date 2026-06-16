@@ -12,7 +12,7 @@ TESTDIR = tests
 TARGET = $(BINDIR)/circom2aoa
 
 SOURCES = $(SRCDIR)/main.c $(SRCDIR)/lexer.c $(SRCDIR)/ast.c $(SRCDIR)/parser.c \
-          $(SRCDIR)/flattener.c $(SRCDIR)/emitter.c $(SRCDIR)/poseidon_lib.c
+          $(SRCDIR)/flattener.c $(SRCDIR)/emitter.c
 OBJECTS = $(SOURCES:.c=.o)
 DEPFILES = $(OBJECTS:.o=.d)
 

@@ -190,31 +190,24 @@ static char *expand_includes_recursive(const char *path, const char *lib_dir, in
         char include_name[512];
         int include_rc = parse_include_line(line, include_name, sizeof(include_name));
         if (include_rc == 1) {
-            if (strcmp(include_name, "poseidon") == 0) {
-                if (append_text(&output, &out_len, &out_cap, line) != 0) {
-                    free(line);
-                    goto fail;
-                }
-            } else {
-                char *include_path = resolve_include_path(current_dir, lib_dir, include_name);
-                if (!include_path) {
-                    fprintf(stderr, "Error: Cannot resolve include '%s' from '%s'\n", include_name, path);
-                    free(line);
-                    goto fail;
-                }
-                char *expanded = expand_includes_recursive(include_path, lib_dir, 0, depth + 1);
-                free(include_path);
-                if (!expanded) {
-                    free(line);
-                    goto fail;
-                }
-                if (append_text(&output, &out_len, &out_cap, expanded) != 0) {
-                    free(expanded);
-                    free(line);
-                    goto fail;
-                }
-                free(expanded);
+            char *include_path = resolve_include_path(current_dir, lib_dir, include_name);
+            if (!include_path) {
+                fprintf(stderr, "Error: Cannot resolve include '%s' from '%s'\n", include_name, path);
+                free(line);
+                goto fail;
             }
+            char *expanded = expand_includes_recursive(include_path, lib_dir, 0, depth + 1);
+            free(include_path);
+            if (!expanded) {
+                free(line);
+                goto fail;
+            }
+            if (append_text(&output, &out_len, &out_cap, expanded) != 0) {
+                free(expanded);
+                free(line);
+                goto fail;
+            }
+            free(expanded);
         } else if (include_rc == 0) {
             const char *trim = line;
             while (*trim == ' ' || *trim == '\t') trim++;

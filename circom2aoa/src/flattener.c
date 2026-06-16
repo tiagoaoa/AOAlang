@@ -7,10 +7,6 @@
 #include <string.h>
 #include <errno.h>
 #include "flattener.h"
-#include "poseidon_lib.h"
-
-/* Counter for unique Poseidon instance prefixes */
-static int poseidon_instance_counter = 0;
 
 /* --- Helpers --- */
 
@@ -527,33 +523,6 @@ static const char *flatten_expr(flattener_t *f, expr_t *e, const char *prefix,
             return result_buf;
         }
 
-        /* Check for library function: Poseidon(x, salt) or Poseidon(x) */
-        if (strcmp(e->u.call.name, "Poseidon") == 0) {
-            if (e->u.call.nargs < 1 || e->u.call.nargs > 2) {
-                fprintf(stderr, "Poseidon() requires 1 or 2 arguments\n");
-                strcpy(result_buf, "ERROR");
-                return result_buf;
-            }
-            /* Flatten arguments */
-            char arg0_buf[MAX_NAME_LEN], arg1_buf[MAX_NAME_LEN];
-            const char *arg0 = flatten_expr(f, e->u.call.args[0], prefix, NULL, arg0_buf);
-            const char *arg1;
-            if (e->u.call.nargs == 2) {
-                arg1 = flatten_expr(f, e->u.call.args[1], prefix, NULL, arg1_buf);
-            } else {
-                arg1 = "0";  /* Poseidon(x) → Poseidon(x, 0) */
-            }
-
-            /* Generate unique prefix for this instance */
-            char inst_prefix[MAX_NAME_LEN];
-            snprintf(inst_prefix, MAX_NAME_LEN, "%spos%d_",
-                     prefix, poseidon_instance_counter++);
-
-            /* Expand inline */
-            poseidon_expand(f, inst_prefix, arg0, arg1, result_buf);
-            return result_buf;
-        }
-
         fprintf(stderr, "Flattener: unknown runtime function '%s'\n", e->u.call.name);
         strcpy(result_buf, "ERROR");
         return result_buf;
@@ -668,14 +637,6 @@ static void flatten_component_body(flattener_t *f, comp_inst_t *ci) {
 
 /* Flush a pending component's body (flatten it now) */
 static void flush_component(flattener_t *f, const char *comp_name, const char *prefix) {
-    for (int i = 0; i < f->ncomps; i++) {
-        if (strcmp(f->comps[i].name, comp_name) == 0 && !f->comps[i].flattened) {
-            f->comps[i].flattened = 1;
-            flatten_component_body(f, &f->comps[i]);
-            return;
-        }
-    }
-    /* Also check with prefix */
     char full_name[MAX_NAME_LEN];
     if (prefix[0]) snprintf(full_name, MAX_NAME_LEN, "%s%s", prefix, comp_name);
     else strncpy(full_name, comp_name, MAX_NAME_LEN - 1);
@@ -754,6 +715,12 @@ static void handle_var_assign(flattener_t *f, stmt_t *s, const char *prefix,
             char comp_name[MAX_NAME_LEN];
             get_target_name(f, s->u.var_assign.target, comp_name);
 
+            char comp_id[MAX_NAME_LEN];
+            if (prefix[0])
+                snprintf(comp_id, MAX_NAME_LEN, "%s%s", prefix, comp_name);
+            else
+                strncpy(comp_id, comp_name, MAX_NAME_LEN - 1);
+
             char comp_prefix[MAX_NAME_LEN];
             if (prefix[0])
                 snprintf(comp_prefix, MAX_NAME_LEN, "%s%s_", prefix, comp_name);
@@ -765,7 +732,8 @@ static void handle_var_assign(flattener_t *f, stmt_t *s, const char *prefix,
                params themselves are only bound when the body is flushed. */
             if (f->ncomps < 256) {
                 comp_inst_t *ci = &f->comps[f->ncomps++];
-                strncpy(ci->name, comp_name, MAX_NAME_LEN - 1);
+                memset(ci, 0, sizeof(*ci));
+                strncpy(ci->name, comp_id, MAX_NAME_LEN - 1);
                 strncpy(ci->prefix, comp_prefix, MAX_NAME_LEN - 1);
                 ci->template_idx = (int)(tmpl - f->prog->templates);
                 ci->nparams = 0;
@@ -1012,8 +980,22 @@ static void flatten_stmt(flattener_t *f, stmt_t *s, const char *prefix,
         /* Just register, instantiation handled in VAR_ASSIGN */
         break;
 
-    case STMT_LOG:
     case STMT_ASSERT:
+    {
+        long long val;
+        if (!eval_const(f, s->u.assert_stmt.expr, &val)) {
+            fprintf(stderr, "Flattener: assert expression must be compile-time constant\n");
+            f->overflowed = 1;
+            break;
+        }
+        if (!val) {
+            fprintf(stderr, "Flattener: assert failed\n");
+            f->overflowed = 1;
+        }
+        break;
+    }
+
+    case STMT_LOG:
     case STMT_RETURN:
         break;  /* Skip */
     }
