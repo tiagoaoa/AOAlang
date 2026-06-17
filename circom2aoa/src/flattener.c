@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>
+#include <limits.h>
 #include "flattener.h"
 
 /* --- Helpers --- */
@@ -15,6 +15,135 @@ void flattener_record_overflow(flattener_t *f, const char *kind, int limit) {
         fprintf(stderr, "Flattener: %s limit exceeded (%d)\n", kind, limit);
     }
     f->overflowed = 1;
+}
+
+static unsigned __int128 ct_int_max_u(void) {
+    return (((unsigned __int128)1) << 127) - 1;
+}
+
+static int parse_ct_int(const char *s, ct_int_t *out) {
+    const char *p = s;
+    int neg = 0;
+    if (*p == '-') {
+        neg = 1;
+        p++;
+    }
+    if (*p < '0' || *p > '9') return 0;
+
+    unsigned __int128 val = 0;
+    unsigned __int128 max = ct_int_max_u();
+    while (*p >= '0' && *p <= '9') {
+        unsigned digit = (unsigned)(*p - '0');
+        if (val > (max - digit) / 10) return 0;
+        val = val * 10 + digit;
+        p++;
+    }
+    if (*p != '\0') return 0;
+
+    *out = neg ? -(ct_int_t)val : (ct_int_t)val;
+    return 1;
+}
+
+static void format_ct_int(ct_int_t val, char *out, size_t out_size) {
+    if (out_size == 0) return;
+    if (val == 0) {
+        snprintf(out, out_size, "0");
+        return;
+    }
+
+    char tmp[128];
+    int pos = 0;
+    int neg = val < 0;
+    unsigned __int128 u = neg ? (unsigned __int128)(-val) : (unsigned __int128)val;
+    while (u > 0 && pos < (int)sizeof(tmp)) {
+        tmp[pos++] = (char)('0' + (u % 10));
+        u /= 10;
+    }
+
+    size_t w = 0;
+    if (neg && w + 1 < out_size) out[w++] = '-';
+    while (pos > 0 && w + 1 < out_size) out[w++] = tmp[--pos];
+    out[w] = '\0';
+}
+
+static int ct_int_to_ll(ct_int_t val, long long *out) {
+    if (val < (ct_int_t)LLONG_MIN || val > (ct_int_t)LLONG_MAX) return 0;
+    *out = (long long)val;
+    return 1;
+}
+
+static int ct_add_checked(ct_int_t a, ct_int_t b, ct_int_t *out) {
+    if (a >= 0 && b >= 0) {
+        unsigned __int128 ua = (unsigned __int128)a;
+        unsigned __int128 ub = (unsigned __int128)b;
+        if (ua > ct_int_max_u() - ub) return 0;
+        *out = (ct_int_t)(ua + ub);
+        return 1;
+    }
+    *out = a + b;
+    return 1;
+}
+
+static int ct_sub_checked(ct_int_t a, ct_int_t b, ct_int_t *out) {
+    if (a >= 0 && b >= 0) {
+        unsigned __int128 ua = (unsigned __int128)a;
+        unsigned __int128 ub = (unsigned __int128)b;
+        if (ua >= ub) {
+            *out = (ct_int_t)(ua - ub);
+        } else {
+            *out = -(ct_int_t)(ub - ua);
+        }
+        return 1;
+    }
+    *out = a - b;
+    return 1;
+}
+
+static int ct_mul_checked(ct_int_t a, ct_int_t b, ct_int_t *out) {
+    if (a >= 0 && b >= 0) {
+        unsigned __int128 ua = (unsigned __int128)a;
+        unsigned __int128 ub = (unsigned __int128)b;
+        if (ua != 0 && ub > ct_int_max_u() / ua) return 0;
+        *out = (ct_int_t)(ua * ub);
+        return 1;
+    }
+    *out = a * b;
+    return 1;
+}
+
+static int ct_shl_checked(ct_int_t a, ct_int_t b, ct_int_t *out) {
+    long long shift;
+    if (!ct_int_to_ll(b, &shift) || shift < 0 || shift >= 127) return 0;
+    if (a >= 0) {
+        unsigned __int128 ua = (unsigned __int128)a;
+        if (ua > (ct_int_max_u() >> shift)) return 0;
+        *out = (ct_int_t)(ua << shift);
+        return 1;
+    }
+    *out = a << shift;
+    return 1;
+}
+
+static int ct_shr_checked(ct_int_t a, ct_int_t b, ct_int_t *out) {
+    long long shift;
+    if (!ct_int_to_ll(b, &shift) || shift < 0 || shift >= 127) return 0;
+    if (a >= 0) {
+        *out = (ct_int_t)(((unsigned __int128)a) >> shift);
+        return 1;
+    }
+    *out = a >> shift;
+    return 1;
+}
+
+static int ct_pow_checked(ct_int_t base, ct_int_t exp, ct_int_t *out) {
+    long long e;
+    if (!ct_int_to_ll(exp, &e) || e < 0) return 0;
+    ct_int_t result = 1;
+    for (long long i = 0; i < e; i++) {
+        if (!ct_mul_checked(result, base, &result)) return 0;
+    }
+    *out = result;
+    return 1;
 }
 
 static void add_op(flattener_t *f, const char *target, char op,
@@ -71,11 +200,12 @@ static int is_assigned(flattener_t *f, const char *name) {
     return 0;
 }
 
-/* Compile-time variable lookup (returns 0 if not found or is runtime) */
-static int ct_lookup(flattener_t *f, const char *name, long long *val) {
+/* Compile-time variable lookup (returns 0 if not found, runtime, or big literal) */
+static int ct_lookup(flattener_t *f, const char *name, ct_int_t *val) {
     for (int i = 0; i < f->nvars; i++) {
         if (strcmp(f->vars[i].name, name) == 0) {
             if (f->vars[i].is_runtime) return 0;
+            if (f->vars[i].is_big) return 0;
             *val = f->vars[i].value;
             return 1;
         }
@@ -100,10 +230,11 @@ static ct_var_t *ct_find(flattener_t *f, const char *name) {
     return NULL;
 }
 
-static void ct_set(flattener_t *f, const char *name, long long val) {
+static void ct_set(flattener_t *f, const char *name, ct_int_t val) {
     for (int i = 0; i < f->nvars; i++) {
         if (strcmp(f->vars[i].name, name) == 0) {
             f->vars[i].value = val;
+            f->vars[i].is_big = 0;
             f->vars[i].is_runtime = 0;
             f->vars[i].runtime_name[0] = '\0';
             return;
@@ -191,43 +322,31 @@ static template_t *template_lookup(flattener_t *f, const char *name) {
 
 /* --- Compile-time expression evaluator --- */
 
-static int eval_const(flattener_t *f, expr_t *e, long long *out) {
+static int eval_const(flattener_t *f, expr_t *e, ct_int_t *out) {
     if (!e) return 0;
 
     switch (e->type) {
     case EXPR_NUMBER: {
-        /* Try to parse as long long; fail gracefully for overflow */
-        char *endptr;
-        errno = 0;
-        long long val = strtoll(e->u.numstr, &endptr, 10);
-        if (errno == ERANGE || *endptr != '\0') {
-            return 0;  /* Number too large for long long */
-        }
-        *out = val;
-        return 1;
+        return parse_ct_int(e->u.numstr, out);
     }
 
     case EXPR_IDENT:
         return ct_lookup(f, e->u.name, out);
 
     case EXPR_BINOP: {
-        long long l, r;
+        ct_int_t l, r;
         if (!eval_const(f, e->u.binop.left, &l)) return 0;
         if (!eval_const(f, e->u.binop.right, &r)) return 0;
         switch (e->u.binop.op) {
-            case OP_ADD: *out = l + r; return 1;
-            case OP_SUB: *out = l - r; return 1;
-            case OP_MUL: *out = l * r; return 1;
+            case OP_ADD: return ct_add_checked(l, r, out);
+            case OP_SUB: return ct_sub_checked(l, r, out);
+            case OP_MUL: return ct_mul_checked(l, r, out);
             case OP_DIV: if (r == 0) return 0; *out = l / r; return 1;
             case OP_MOD: if (r == 0) return 0; *out = l % r; return 1;
             case OP_INTDIV: if (r == 0) return 0; *out = l / r; return 1;
-            case OP_POW: {
-                long long result = 1;
-                for (long long i = 0; i < r; i++) result *= l;
-                *out = result; return 1;
-            }
-            case OP_SHL: *out = l << r; return 1;
-            case OP_SHR: *out = l >> r; return 1;
+            case OP_POW: return ct_pow_checked(l, r, out);
+            case OP_SHL: return ct_shl_checked(l, r, out);
+            case OP_SHR: return ct_shr_checked(l, r, out);
             case OP_BIT_AND: *out = l & r; return 1;
             case OP_BIT_OR: *out = l | r; return 1;
             case OP_BIT_XOR: *out = l ^ r; return 1;
@@ -244,7 +363,7 @@ static int eval_const(flattener_t *f, expr_t *e, long long *out) {
     }
 
     case EXPR_UNARYOP: {
-        long long v;
+        ct_int_t v;
         if (!eval_const(f, e->u.unary.operand, &v)) return 0;
         if (e->u.unary.op == '-') { *out = -v; return 1; }
         if (e->u.unary.op == '!') { *out = !v; return 1; }
@@ -253,7 +372,7 @@ static int eval_const(flattener_t *f, expr_t *e, long long *out) {
     }
 
     case EXPR_TERNARY: {
-        long long cond;
+        ct_int_t cond;
         if (!eval_const(f, e->u.ternary.cond, &cond)) return 0;
         if (cond) return eval_const(f, e->u.ternary.then_e, out);
         else return eval_const(f, e->u.ternary.else_e, out);
@@ -286,9 +405,9 @@ static const char *flatten_expr(flattener_t *f, expr_t *e, const char *prefix,
 
     switch (e->type) {
     case EXPR_NUMBER: {
-        long long val;
+        ct_int_t val;
         if (eval_const(f, e, &val)) {
-            snprintf(result_buf, MAX_NAME_LEN, "%lld", val);
+            format_ct_int(val, result_buf, MAX_NAME_LEN);
         } else {
             /* Big number: emit the string directly */
             strncpy(result_buf, e->u.numstr, MAX_NAME_LEN - 1);
@@ -304,9 +423,9 @@ static const char *flatten_expr(flattener_t *f, expr_t *e, const char *prefix,
             strncpy(result_buf, rt, MAX_NAME_LEN - 1);
             return result_buf;
         }
-        long long val;
+        ct_int_t val;
         if (ct_lookup(f, e->u.name, &val)) {
-            snprintf(result_buf, MAX_NAME_LEN, "%lld", val);
+            format_ct_int(val, result_buf, MAX_NAME_LEN);
             return result_buf;
         }
         /* Check if it's a big compile-time var */
@@ -334,8 +453,9 @@ static const char *flatten_expr(flattener_t *f, expr_t *e, const char *prefix,
     }
 
     case EXPR_ARRAY_ACCESS: {
+        ct_int_t idx_val;
         long long idx;
-        if (!eval_const(f, e->u.array.index, &idx)) {
+        if (!eval_const(f, e->u.array.index, &idx_val) || !ct_int_to_ll(idx_val, &idx)) {
             fprintf(stderr, "Flattener: array index must be compile-time constant\n");
             strcpy(result_buf, "ERROR");
             return result_buf;
@@ -392,9 +512,9 @@ static const char *flatten_expr(flattener_t *f, expr_t *e, const char *prefix,
 
     case EXPR_UNARYOP: {
         if (e->u.unary.op == '-') {
-            long long val;
+            ct_int_t val;
             if (eval_const(f, e->u.unary.operand, &val)) {
-                snprintf(result_buf, MAX_NAME_LEN, "%lld", -val);
+                format_ct_int(-val, result_buf, MAX_NAME_LEN);
                 return result_buf;
             }
             char operand[MAX_NAME_LEN];
@@ -408,7 +528,7 @@ static const char *flatten_expr(flattener_t *f, expr_t *e, const char *prefix,
             return result_buf;
         }
         if (e->u.unary.op == '!') {
-            long long val;
+            ct_int_t val;
             if (eval_const(f, e->u.unary.operand, &val)) {
                 snprintf(result_buf, MAX_NAME_LEN, "%d", val == 0 ? 1 : 0);
                 return result_buf;
@@ -432,9 +552,9 @@ static const char *flatten_expr(flattener_t *f, expr_t *e, const char *prefix,
 
     case EXPR_BINOP: {
         /* Try compile-time evaluation first */
-        long long val;
+        ct_int_t val;
         if (eval_const(f, e, &val)) {
-            snprintf(result_buf, MAX_NAME_LEN, "%lld", val);
+            format_ct_int(val, result_buf, MAX_NAME_LEN);
             return result_buf;
         }
 
@@ -455,8 +575,9 @@ static const char *flatten_expr(flattener_t *f, expr_t *e, const char *prefix,
         }
 
         if (op == OP_POW) {
+            ct_int_t exp_ct;
             long long exp_val;
-            if (!eval_const(f, e->u.binop.right, &exp_val)) {
+            if (!eval_const(f, e->u.binop.right, &exp_ct) || !ct_int_to_ll(exp_ct, &exp_val)) {
                 fprintf(stderr, "Flattener: exponent must be compile-time constant\n");
                 strcpy(result_buf, "ERROR");
                 return result_buf;
@@ -493,7 +614,7 @@ static const char *flatten_expr(flattener_t *f, expr_t *e, const char *prefix,
 
         /* Other ops: compile-time only */
         if (eval_const(f, e, &val)) {
-            snprintf(result_buf, MAX_NAME_LEN, "%lld", val);
+            format_ct_int(val, result_buf, MAX_NAME_LEN);
             return result_buf;
         }
 
@@ -503,7 +624,7 @@ static const char *flatten_expr(flattener_t *f, expr_t *e, const char *prefix,
     }
 
     case EXPR_TERNARY: {
-        long long cond;
+        ct_int_t cond;
         if (eval_const(f, e->u.ternary.cond, &cond)) {
             if (cond)
                 return flatten_expr(f, e->u.ternary.then_e, prefix, target_hint, result_buf);
@@ -517,9 +638,9 @@ static const char *flatten_expr(flattener_t *f, expr_t *e, const char *prefix,
 
     case EXPR_CALL: {
         /* Try compile-time evaluation first */
-        long long val;
+        ct_int_t val;
         if (eval_const(f, e, &val)) {
-            snprintf(result_buf, MAX_NAME_LEN, "%lld", val);
+            format_ct_int(val, result_buf, MAX_NAME_LEN);
             return result_buf;
         }
 
@@ -550,8 +671,12 @@ static void resolve_signal_name(flattener_t *f, expr_t *e, const char *prefix, c
         if (prefix[0]) snprintf(out, MAX_NAME_LEN, "%s%s", prefix, e->u.name);
         else strncpy(out, e->u.name, MAX_NAME_LEN);
     } else if (e->type == EXPR_ARRAY_ACCESS) {
-        long long idx;
-        eval_const(f, e->u.array.index, &idx);
+        ct_int_t idx_val;
+        long long idx = 0;
+        if (!eval_const(f, e->u.array.index, &idx_val) || !ct_int_to_ll(idx_val, &idx)) {
+            strcpy(out, "ERROR");
+            return;
+        }
 
         /* Check for component.field[idx] pattern */
         char *dot = strchr(e->u.array.name, '.');
@@ -592,8 +717,12 @@ static void get_target_name(flattener_t *f, expr_t *e, char *out) {
     if (e->type == EXPR_IDENT) {
         strncpy(out, e->u.name, MAX_NAME_LEN);
     } else if (e->type == EXPR_ARRAY_ACCESS) {
-        long long idx;
-        eval_const(f, e->u.array.index, &idx);
+        ct_int_t idx_val;
+        long long idx = 0;
+        if (!eval_const(f, e->u.array.index, &idx_val) || !ct_int_to_ll(idx_val, &idx)) {
+            strcpy(out, "ERROR");
+            return;
+        }
         snprintf(out, MAX_NAME_LEN, "%s_%lld", e->u.array.name, idx);
     } else if (e->type == EXPR_COMPONENT_ACCESS) {
         snprintf(out, MAX_NAME_LEN, "%s_%s", e->u.comp_access.comp, e->u.comp_access.field);
@@ -664,8 +793,13 @@ static void handle_signal_decl(flattener_t *f, stmt_t *s, const char *prefix,
 
         int size = 0;
         if (s->u.signal_decl.sizes[i]) {
-            long long sz;
-            eval_const(f, s->u.signal_decl.sizes[i], &sz);
+            ct_int_t sz_ct;
+            long long sz = 0;
+            if (!eval_const(f, s->u.signal_decl.sizes[i], &sz_ct) ||
+                !ct_int_to_ll(sz_ct, &sz)) {
+                fprintf(stderr, "Flattener: signal array size must be compile-time constant\n");
+                f->overflowed = 1;
+            }
             size = (int)sz;
         }
 
@@ -689,7 +823,7 @@ static void handle_signal_decl(flattener_t *f, stmt_t *s, const char *prefix,
 
 static void handle_var_decl(flattener_t *f, stmt_t *s) {
     for (int i = 0; i < s->u.var_decl.count; i++) {
-        long long val = 0;
+        ct_int_t val = 0;
         if (s->u.var_decl.inits[i]) {
             if (eval_const(f, s->u.var_decl.inits[i], &val)) {
                 ct_set(f, s->u.var_decl.names[i], val);
@@ -738,7 +872,7 @@ static void handle_var_assign(flattener_t *f, stmt_t *s, const char *prefix,
                 ci->template_idx = (int)(tmpl - f->prog->templates);
                 ci->nparams = 0;
                 for (int i = 0; i < tmpl->nparams && i < s->u.var_assign.value->u.call.nargs; i++) {
-                    long long val = 0;
+                    ct_int_t val = 0;
                     eval_const(f, s->u.var_assign.value->u.call.args[i], &val);
                     ci->param_values[ci->nparams++] = val;
                 }
@@ -768,7 +902,7 @@ static void handle_var_assign(flattener_t *f, stmt_t *s, const char *prefix,
     get_target_name(f, s->u.var_assign.target, target_name);
 
     /* Try compile-time evaluation */
-    long long val;
+    ct_int_t val;
     if (s->u.var_assign.op == ASGN_EQ && eval_const(f, s->u.var_assign.value, &val)) {
         ct_set(f, target_name, val);
         return;
@@ -794,23 +928,29 @@ static void handle_var_assign(flattener_t *f, stmt_t *s, const char *prefix,
     }
 
     /* Compile-time compound assignment */
-    long long cur_val = 0;
+    ct_int_t cur_val = 0;
     int is_ct = ct_lookup(f, target_name, &cur_val);
-    long long rhs;
+    ct_int_t rhs;
     if (eval_const(f, s->u.var_assign.value, &rhs)) {
+        int ok = 1;
         switch (s->u.var_assign.op) {
             case ASGN_EQ:       cur_val = rhs; break;
-            case ASGN_PLUS_EQ:  cur_val += rhs; break;
-            case ASGN_MINUS_EQ: cur_val -= rhs; break;
-            case ASGN_STAR_EQ:  cur_val *= rhs; break;
+            case ASGN_PLUS_EQ:  ok = ct_add_checked(cur_val, rhs, &cur_val); break;
+            case ASGN_MINUS_EQ: ok = ct_sub_checked(cur_val, rhs, &cur_val); break;
+            case ASGN_STAR_EQ:  ok = ct_mul_checked(cur_val, rhs, &cur_val); break;
             case ASGN_SLASH_EQ: if (rhs) cur_val /= rhs; break;
             case ASGN_MOD_EQ:   if (rhs) cur_val %= rhs; break;
-            case ASGN_SHL_EQ:   cur_val <<= rhs; break;
-            case ASGN_SHR_EQ:   cur_val >>= rhs; break;
+            case ASGN_SHL_EQ:   ok = ct_shl_checked(cur_val, rhs, &cur_val); break;
+            case ASGN_SHR_EQ:   ok = ct_shr_checked(cur_val, rhs, &cur_val); break;
             case ASGN_AND_EQ:   cur_val &= rhs; break;
             case ASGN_OR_EQ:    cur_val |= rhs; break;
             case ASGN_XOR_EQ:   cur_val ^= rhs; break;
             default: break;
+        }
+        if (!ok) {
+            fprintf(stderr, "Flattener: compile-time arithmetic overflow\n");
+            f->overflowed = 1;
+            return;
         }
         ct_set(f, target_name, cur_val);
     } else {
@@ -837,7 +977,7 @@ static void handle_var_assign(flattener_t *f, stmt_t *s, const char *prefix,
             } else if (is_ct) {
                 /* lc was a constant, lc += expr  →  new = const + rhs */
                 char const_str[MAX_NAME_LEN];
-                snprintf(const_str, MAX_NAME_LEN, "%lld", cur_val);
+                format_ct_int(cur_val, const_str, MAX_NAME_LEN);
                 add_op(f, new_gate, '+', const_str, rhs_var);
             } else {
                 add_op(f, new_gate, '+', "0", rhs_var);
@@ -849,7 +989,7 @@ static void handle_var_assign(flattener_t *f, stmt_t *s, const char *prefix,
                 add_op(f, new_gate, '*', old_rt, rhs_var);
             } else {
                 char const_str[MAX_NAME_LEN];
-                snprintf(const_str, MAX_NAME_LEN, "%lld", cur_val);
+                format_ct_int(cur_val, const_str, MAX_NAME_LEN);
                 add_op(f, new_gate, '*', const_str, rhs_var);
             }
             mark_assigned(f, new_gate);
@@ -859,7 +999,7 @@ static void handle_var_assign(flattener_t *f, stmt_t *s, const char *prefix,
                 add_op(f, new_gate, '-', old_rt, rhs_var);
             } else {
                 char const_str[MAX_NAME_LEN];
-                snprintf(const_str, MAX_NAME_LEN, "%lld", cur_val);
+                format_ct_int(cur_val, const_str, MAX_NAME_LEN);
                 add_op(f, new_gate, '-', const_str, rhs_var);
             }
             mark_assigned(f, new_gate);
@@ -879,7 +1019,7 @@ static void handle_for(flattener_t *f, stmt_t *s, const char *prefix,
 
     int max_iter = 10000;
     for (int count = 0; count < max_iter; count++) {
-        long long cond;
+        ct_int_t cond;
         if (!eval_const(f, s->u.for_loop.cond, &cond) || !cond)
             break;
 
@@ -893,7 +1033,7 @@ static void handle_for(flattener_t *f, stmt_t *s, const char *prefix,
 
 static void handle_if(flattener_t *f, stmt_t *s, const char *prefix,
                        const char **public_set, int npublic) {
-    long long cond;
+    ct_int_t cond;
     if (!eval_const(f, s->u.if_else.cond, &cond)) {
         fprintf(stderr, "Flattener: if condition must be compile-time constant\n");
         return;
@@ -982,7 +1122,7 @@ static void flatten_stmt(flattener_t *f, stmt_t *s, const char *prefix,
 
     case STMT_ASSERT:
     {
-        long long val;
+        ct_int_t val;
         if (!eval_const(f, s->u.assert_stmt.expr, &val)) {
             fprintf(stderr, "Flattener: assert expression must be compile-time constant\n");
             f->overflowed = 1;
@@ -1024,7 +1164,7 @@ int flattener_run(flattener_t *f) {
 
     /* Set template params from main args */
     for (int i = 0; i < tmpl->nparams && i < mc->nargs; i++) {
-        long long val;
+        ct_int_t val;
         if (eval_const(f, mc->args[i], &val)) {
             ct_set(f, tmpl->params[i], val);
         } else {

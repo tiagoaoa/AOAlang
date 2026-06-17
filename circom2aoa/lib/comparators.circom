@@ -17,8 +17,7 @@
     along with circom. If not, see <https://www.gnu.org/licenses/>.
 */
 
-// circomlib's comparators.circom, plus a local GreaterEqThan64 extension
-// at the end of the file.
+// circomlib's comparators.circom.
 
 pragma circom 2.0.0;
 
@@ -110,64 +109,4 @@ template GreaterEqThan(n) {
     lt.in[0] <== in[1];
     lt.in[1] <== in[0]+1;
     lt.out ==> out;
-}
-
-// --- Local extension (not part of circomlib) ---
-// 64-bit greater-or-equal. The templates above are limited to n <= 62 in
-// circom2aoa: the transpiler evaluates constants like (1 << n) in signed
-// 64-bit arithmetic, so larger widths silently overflow. This template
-// splits the operands into 32-bit halves to stay within that range.
-template GreaterEqThan64() {
-    signal input in[2];
-    signal output out;
-
-    signal a_lo;
-    signal a_hi;
-    signal b_lo;
-    signal b_hi;
-
-    signal a_reconstructed;
-    signal b_reconstructed;
-
-    a_lo <-- in[0] & 4294967295;
-    a_hi <-- in[0] >> 32;
-    b_lo <-- in[1] & 4294967295;
-    b_hi <-- in[1] >> 32;
-
-    component a_lo_bits = Num2Bits(32);
-    component a_hi_bits = Num2Bits(32);
-    component b_lo_bits = Num2Bits(32);
-    component b_hi_bits = Num2Bits(32);
-
-    a_lo_bits.in <== a_lo;
-    a_hi_bits.in <== a_hi;
-    b_lo_bits.in <== b_lo;
-    b_hi_bits.in <== b_hi;
-
-    a_reconstructed <== a_lo + a_hi * 4294967296;
-    b_reconstructed <== b_lo + b_hi * 4294967296;
-
-    a_reconstructed === in[0];
-    b_reconstructed === in[1];
-
-    component hi_ge_ab = GreaterEqThan(32);
-    hi_ge_ab.in[0] <== a_hi;
-    hi_ge_ab.in[1] <== b_hi;
-
-    component hi_ge_ba = GreaterEqThan(32);
-    hi_ge_ba.in[0] <== b_hi;
-    hi_ge_ba.in[1] <== a_hi;
-
-    component lo_ge = GreaterEqThan(32);
-    lo_ge.in[0] <== a_lo;
-    lo_ge.in[1] <== b_lo;
-
-    signal hi_eq;
-    signal hi_gt;
-
-    hi_eq <== hi_ge_ab.out * hi_ge_ba.out;
-    hi_gt <== hi_ge_ab.out * (1 - hi_ge_ba.out);
-
-    out <== hi_gt + hi_eq * lo_ge.out;
-    out * (out - 1) === 0;
 }

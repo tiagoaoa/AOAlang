@@ -1,4 +1,4 @@
 pragma circom 2.0.0;
 include "comparators";
 
-component main {public [in]} = GreaterEqThan64();
+component main {public [in]} = GreaterEqThan(64);

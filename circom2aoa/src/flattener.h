@@ -13,6 +13,8 @@
 #define MAX_OPS    65536
 #define MAX_VARS   16384
 
+typedef __int128 ct_int_t;
+
 /* A single flat AOA operation */
 typedef struct {
     char target[MAX_NAME_LEN];
@@ -33,7 +35,7 @@ typedef struct {
 /* Compile-time variable (or runtime alias) */
 typedef struct {
     char name[MAX_NAME_LEN];
-    long long value;
+    ct_int_t value;
     char bigvalue[80];             /* string value for large constants that overflow long long */
     int is_big;                    /* 1 if value doesn't fit in long long */
     int is_runtime;                /* 1 if var holds a gate variable name, not a constant */
@@ -45,7 +47,7 @@ typedef struct {
     char name[MAX_NAME_LEN];
     char prefix[MAX_NAME_LEN];
     int template_idx;       /* index into program_t.templates */
-    long long param_values[MAX_PARAMS];
+    ct_int_t param_values[MAX_PARAMS];
     int nparams;
     int flattened;          /* 1 if body already flattened */
 } comp_inst_t;
