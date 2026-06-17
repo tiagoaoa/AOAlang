@@ -72,6 +72,8 @@ Both source and generated files must follow their corresponding grammars. Do not
 
 ## Circom Rules
 
+Write Circom in the traditional upstream style. Treat `circom2aoa` as standard Circom plus visibility classification for inputs, not as a separate component-call language.
+
 Every `.circom` file must have:
 
 - `pragma circom 2.0.0;`
@@ -85,6 +87,13 @@ Signal visibility matters:
 - Unlisted `signal input` values are private by default.
 - `signal output` values become public/deferred in AOA.
 - Explicit `signal public input` / `signal private input` wins over the `main {public [...]}` list.
+
+Component usage should stay traditional:
+
+- Instantiate templates with `component c = Template(args);`.
+- Wire template inputs and outputs explicitly through signals such as `c.in[0] <== x;` and `out <== c.out;`.
+- Do not rely on function-style template calls such as `out <== Poseidon(a, b);` even if a transpiler extension accepts them.
+- Follow the actual interface exposed by the included library template. For example, `GreaterEqThan` uses `in[0]` / `in[1]`, not `.a` / `.b`.
 
 Use Circom operators carefully:
 
@@ -109,6 +118,15 @@ Current library files:
 - `bitify.circom`: `Num2Bits`, `Bits2Num`
 - `comparators.circom`: circomlib-style comparators such as `LessThan`, `GreaterEqThan`, `IsZero`, `IsEqual`
 - `poseidon.circom`: Poseidon component templates currently supporting one-input and two-input backends (`Poseidon(1)`, `Poseidon(2)`, `PoseidonEx(1, 1)`, `PoseidonEx(2, 1)`)
+
+When using these libraries, prefer standard component wiring. Example:
+
+```circom
+component h = Poseidon(2);
+h.inputs[0] <== left;
+h.inputs[1] <== right;
+out <== h.out;
+```
 
 Includes are resolved relative to the circuit file and `circom2aoa/lib`. Do not use removed alias paths such as `circomlib/circuits/...` unless they are reintroduced intentionally.
 

@@ -365,8 +365,8 @@ static int register_component_instance(flattener_t *f, template_t *tmpl,
         snprintf(comp_prefix, MAX_NAME_LEN, "%s_", comp_name);
     comp_prefix[MAX_NAME_LEN - 1] = '\0';
 
-    if (f->ncomps >= 256) {
-        flattener_record_overflow(f, "component", 256);
+    if (f->ncomps >= MAX_COMPONENTS) {
+        flattener_record_overflow(f, "component", MAX_COMPONENTS);
         return 0;
     }
 

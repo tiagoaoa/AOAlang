@@ -11,7 +11,8 @@
 #include "ast.h"
 
 #define MAX_OPS    65536
-#define MAX_VARS   16384
+#define MAX_VARS   65536
+#define MAX_COMPONENTS 4096
 
 typedef __int128 ct_int_t;
 
@@ -66,7 +67,7 @@ typedef struct {
     ct_var_t vars[MAX_VARS];
     int nvars;
 
-    comp_inst_t comps[256];
+    comp_inst_t comps[MAX_COMPONENTS];
     int ncomps;
 
     int temp_counter;

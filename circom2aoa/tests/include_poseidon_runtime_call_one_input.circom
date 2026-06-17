@@ -6,7 +6,9 @@ template Hash1RuntimeCall() {
     signal input a;
     signal output out;
 
-    out <== Poseidon(a);
+    component h = Poseidon(1);
+    h.inputs[0] <== a;
+    out <== h.out;
 }
 
 component main {public [a]} = Hash1RuntimeCall();

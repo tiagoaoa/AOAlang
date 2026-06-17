@@ -7,7 +7,10 @@ template Hash2RuntimeCall() {
     signal input b;
     signal output out;
 
-    out <== Poseidon(a, b);
+    component h = Poseidon(2);
+    h.inputs[0] <== a;
+    h.inputs[1] <== b;
+    out <== h.out;
 }
 
 component main {public [a]} = Hash2RuntimeCall();
