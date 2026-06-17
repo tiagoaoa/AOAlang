@@ -320,6 +320,183 @@ static template_t *template_lookup(flattener_t *f, const char *name) {
     return NULL;
 }
 
+static int eval_const(flattener_t *f, expr_t *e, ct_int_t *out);
+static void flatten_stmt(flattener_t *f, stmt_t *s, const char *prefix,
+                         const char **public_set, int npublic);
+static const char *flatten_expr(flattener_t *f, expr_t *e, const char *prefix,
+                                const char *target_hint, char *result_buf);
+static void flush_component(flattener_t *f, const char *comp_name, const char *prefix);
+
+typedef struct {
+    int uses_array_input;
+    char array_input_name[MAX_NAME_LEN];
+    char scalar_input_names[MAX_PARAMS][MAX_NAME_LEN];
+    int nscalar_inputs;
+    char output_name[MAX_NAME_LEN];
+    int output_index;  /* -1 for scalar output, >=0 for fixed array element */
+    ct_int_t param_values[MAX_PARAMS];
+    int nparams;
+} template_call_sig_t;
+
+static int eval_const_ll(flattener_t *f, expr_t *e, long long *out) {
+    ct_int_t val;
+    return eval_const(f, e, &val) && ct_int_to_ll(val, out);
+}
+
+static int expr_is_ident_named(expr_t *e, const char *name) {
+    return e && e->type == EXPR_IDENT && strcmp(e->u.name, name) == 0;
+}
+
+static int register_component_instance(flattener_t *f, template_t *tmpl,
+                                       const char *comp_name, const char *prefix,
+                                       const ct_int_t *param_values, int nparams,
+                                       char *comp_id_out, char *comp_prefix_out) {
+    char comp_id[MAX_NAME_LEN];
+    if (prefix[0])
+        snprintf(comp_id, MAX_NAME_LEN, "%s%s", prefix, comp_name);
+    else
+        strncpy(comp_id, comp_name, MAX_NAME_LEN - 1);
+    comp_id[MAX_NAME_LEN - 1] = '\0';
+
+    char comp_prefix[MAX_NAME_LEN];
+    if (prefix[0])
+        snprintf(comp_prefix, MAX_NAME_LEN, "%s%s_", prefix, comp_name);
+    else
+        snprintf(comp_prefix, MAX_NAME_LEN, "%s_", comp_name);
+    comp_prefix[MAX_NAME_LEN - 1] = '\0';
+
+    if (f->ncomps >= 256) {
+        flattener_record_overflow(f, "component", 256);
+        return 0;
+    }
+
+    comp_inst_t *ci = &f->comps[f->ncomps++];
+    memset(ci, 0, sizeof(*ci));
+    strncpy(ci->name, comp_id, MAX_NAME_LEN - 1);
+    strncpy(ci->prefix, comp_prefix, MAX_NAME_LEN - 1);
+    ci->template_idx = (int)(tmpl - f->prog->templates);
+    ci->nparams = nparams;
+    for (int i = 0; i < nparams; i++)
+        ci->param_values[i] = param_values[i];
+    ci->flattened = 0;
+
+    if (comp_id_out) {
+        strncpy(comp_id_out, comp_id, MAX_NAME_LEN - 1);
+        comp_id_out[MAX_NAME_LEN - 1] = '\0';
+    }
+    if (comp_prefix_out) {
+        strncpy(comp_prefix_out, comp_prefix, MAX_NAME_LEN - 1);
+        comp_prefix_out[MAX_NAME_LEN - 1] = '\0';
+    }
+    return 1;
+}
+
+static int infer_template_call_signature(flattener_t *f, template_t *tmpl, int nargs,
+                                         template_call_sig_t *sig) {
+    memset(sig, 0, sizeof(*sig));
+    sig->output_index = -1;
+
+    for (int i = 0; i < tmpl->nbody; i++) {
+        stmt_t *s = tmpl->body[i];
+        if (!s || s->type != STMT_SIGNAL_DECL) continue;
+
+        for (int j = 0; j < s->u.signal_decl.count; j++) {
+            expr_t *size_expr = s->u.signal_decl.sizes[j];
+            const char *name = s->u.signal_decl.names[j];
+
+            if (s->u.signal_decl.dir == SIG_INPUT) {
+                if (size_expr) {
+                    long long size_val = 0;
+                    if (sig->uses_array_input || sig->nscalar_inputs > 0) return 0;
+
+                    sig->uses_array_input = 1;
+                    strncpy(sig->array_input_name, name, MAX_NAME_LEN - 1);
+
+                    if (tmpl->nparams == 1 && expr_is_ident_named(size_expr, tmpl->params[0])) {
+                        sig->nparams = 1;
+                        sig->param_values[0] = nargs;
+                    } else if (tmpl->nparams == 0 &&
+                               eval_const_ll(f, size_expr, &size_val) &&
+                               size_val == nargs) {
+                        sig->nparams = 0;
+                    } else {
+                        return 0;
+                    }
+                } else {
+                    if (sig->uses_array_input || tmpl->nparams != 0 ||
+                        sig->nscalar_inputs >= MAX_PARAMS)
+                        return 0;
+                    strncpy(sig->scalar_input_names[sig->nscalar_inputs], name, MAX_NAME_LEN - 1);
+                    sig->nscalar_inputs++;
+                }
+            } else if (s->u.signal_decl.dir == SIG_OUTPUT) {
+                long long size_val = 0;
+                if (sig->output_name[0] != '\0') return 0;
+
+                strncpy(sig->output_name, name, MAX_NAME_LEN - 1);
+                if (!size_expr) continue;
+
+                if (eval_const_ll(f, size_expr, &size_val) && size_val == 1) {
+                    sig->output_index = 0;
+                } else {
+                    return 0;
+                }
+            }
+        }
+    }
+
+    if (sig->output_name[0] == '\0') return 0;
+    if (sig->uses_array_input)
+        return tmpl->nparams == sig->nparams;
+    return tmpl->nparams == 0 && sig->nscalar_inputs == nargs;
+}
+
+static int flatten_template_call(flattener_t *f, template_t *tmpl, expr_t *e,
+                                 const char *prefix, char *result_buf) {
+    template_call_sig_t sig;
+    if (!infer_template_call_signature(f, tmpl, e->u.call.nargs, &sig))
+        return 0;
+
+    char comp_name[MAX_NAME_LEN];
+    snprintf(comp_name, MAX_NAME_LEN, "calltmp%d", f->call_counter++);
+
+    char comp_prefix[MAX_NAME_LEN];
+    if (!register_component_instance(f, tmpl, comp_name, prefix,
+                                     sig.param_values, sig.nparams,
+                                     NULL, comp_prefix)) {
+        strcpy(result_buf, "ERROR");
+        return 1;
+    }
+
+    if (sig.uses_array_input) {
+        for (int i = 0; i < e->u.call.nargs; i++) {
+            char arg_value[MAX_NAME_LEN];
+            char target[MAX_NAME_LEN];
+            flatten_expr(f, e->u.call.args[i], prefix, NULL, arg_value);
+            snprintf(target, MAX_NAME_LEN, "%s%s_%d", comp_prefix, sig.array_input_name, i);
+            add_op(f, target, 'I', arg_value, NULL);
+            mark_assigned(f, target);
+        }
+    } else {
+        for (int i = 0; i < sig.nscalar_inputs; i++) {
+            char arg_value[MAX_NAME_LEN];
+            char target[MAX_NAME_LEN];
+            flatten_expr(f, e->u.call.args[i], prefix, NULL, arg_value);
+            snprintf(target, MAX_NAME_LEN, "%s%s", comp_prefix, sig.scalar_input_names[i]);
+            add_op(f, target, 'I', arg_value, NULL);
+            mark_assigned(f, target);
+        }
+    }
+
+    flush_component(f, comp_name, prefix);
+
+    if (sig.output_index >= 0)
+        snprintf(result_buf, MAX_NAME_LEN, "%s%s_%d", comp_prefix, sig.output_name, sig.output_index);
+    else
+        snprintf(result_buf, MAX_NAME_LEN, "%s%s", comp_prefix, sig.output_name);
+    return 1;
+}
+
 /* --- Compile-time expression evaluator --- */
 
 static int eval_const(flattener_t *f, expr_t *e, ct_int_t *out) {
@@ -644,6 +821,16 @@ static const char *flatten_expr(flattener_t *f, expr_t *e, const char *prefix,
             return result_buf;
         }
 
+        template_t *tmpl = template_lookup(f, e->u.call.name);
+        if (tmpl) {
+            if (flatten_template_call(f, tmpl, e, prefix, result_buf))
+                return result_buf;
+            fprintf(stderr, "Flattener: template '%s' cannot be used as an expression call\n",
+                    e->u.call.name);
+            strcpy(result_buf, "ERROR");
+            return result_buf;
+        }
+
         fprintf(stderr, "Flattener: unknown runtime function '%s'\n", e->u.call.name);
         strcpy(result_buf, "ERROR");
         return result_buf;
@@ -849,35 +1036,18 @@ static void handle_var_assign(flattener_t *f, stmt_t *s, const char *prefix,
             char comp_name[MAX_NAME_LEN];
             get_target_name(f, s->u.var_assign.target, comp_name);
 
-            char comp_id[MAX_NAME_LEN];
-            if (prefix[0])
-                snprintf(comp_id, MAX_NAME_LEN, "%s%s", prefix, comp_name);
-            else
-                strncpy(comp_id, comp_name, MAX_NAME_LEN - 1);
-
-            char comp_prefix[MAX_NAME_LEN];
-            if (prefix[0])
-                snprintf(comp_prefix, MAX_NAME_LEN, "%s%s_", prefix, comp_name);
-            else
-                snprintf(comp_prefix, MAX_NAME_LEN, "%s_", comp_name);
-
             /* Register as pending component — body will be flattened later.
                Param args are evaluated now, in the parent's scope; the
                params themselves are only bound when the body is flushed. */
-            if (f->ncomps < 256) {
-                comp_inst_t *ci = &f->comps[f->ncomps++];
-                memset(ci, 0, sizeof(*ci));
-                strncpy(ci->name, comp_id, MAX_NAME_LEN - 1);
-                strncpy(ci->prefix, comp_prefix, MAX_NAME_LEN - 1);
-                ci->template_idx = (int)(tmpl - f->prog->templates);
-                ci->nparams = 0;
-                for (int i = 0; i < tmpl->nparams && i < s->u.var_assign.value->u.call.nargs; i++) {
-                    ct_int_t val = 0;
-                    eval_const(f, s->u.var_assign.value->u.call.args[i], &val);
-                    ci->param_values[ci->nparams++] = val;
-                }
-                ci->flattened = 0;
+            ct_int_t param_values[MAX_PARAMS];
+            int nparams = 0;
+            for (int i = 0; i < tmpl->nparams && i < s->u.var_assign.value->u.call.nargs; i++) {
+                ct_int_t val = 0;
+                eval_const(f, s->u.var_assign.value->u.call.args[i], &val);
+                param_values[nparams++] = val;
             }
+            register_component_instance(f, tmpl, comp_name, prefix,
+                                        param_values, nparams, NULL, NULL);
             return;
         }
     }

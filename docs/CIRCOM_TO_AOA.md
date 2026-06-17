@@ -66,6 +66,7 @@ bin/circom2aoa --validate circuit.circom
 | `signal input/output` | Supported | Mapped to AOA `decl private`/`decl deferred` |
 | `component main {public [...]}` | Supported | Controls deferred vs private when no explicit visibility |
 | `component` instantiation | Supported | Deferred (lazy) body flattening |
+| Template expression call (`out <== Poseidon(a, b)`) | Supported | Synthesizes a component when the template has a single-return function-like interface |
 | `<==` (constrain + assign) | Supported | Produces AOA assignment or equality check |
 | `===` (constrain only) | Supported | Produces AOA equality check |
 | `<--` (witness hint) | Supported | Sub-component signals declared as `decl private` |

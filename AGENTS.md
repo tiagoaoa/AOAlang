@@ -108,7 +108,7 @@ Current library files:
 
 - `bitify.circom`: `Num2Bits`, `Bits2Num`
 - `comparators.circom`: circomlib-style comparators such as `LessThan`, `GreaterEqThan`, `IsZero`, `IsEqual`
-- `poseidon.circom`: Poseidon component templates currently supporting the fixed two-input backend (`Poseidon(2)` / `PoseidonEx(2, 1)`)
+- `poseidon.circom`: Poseidon component templates currently supporting one-input and two-input backends (`Poseidon(1)`, `Poseidon(2)`, `PoseidonEx(1, 1)`, `PoseidonEx(2, 1)`)
 
 Includes are resolved relative to the circuit file and `circom2aoa/lib`. Do not use removed alias paths such as `circomlib/circuits/...` unless they are reintroduced intentionally.
 

@@ -71,6 +71,7 @@ typedef struct {
 
     int temp_counter;
     int check_counter;
+    int call_counter;
 
     /* Track assigned gate variables */
     char assigned[MAX_VARS][MAX_NAME_LEN];

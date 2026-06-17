@@ -219,6 +219,18 @@ m.b <== y;              // Wire input
 out <== m.c;            // Read output
 ```
 
+Function-style expression calls are also supported for templates with a single
+return value, for example:
+
+```circom
+out <== Poseidon(a, b);
+```
+
+The transpiler lowers this to a synthesized component instance when the template
+has a function-like interface: exactly one output signal, plus either positional
+scalar inputs or a single input array whose size can be inferred from the call
+arity.
+
 Component body flattening is **deferred** -- the component's constraints are not emitted until an output signal is accessed. This allows inputs to be wired before the body is evaluated.
 
 ### Component Signal Access
