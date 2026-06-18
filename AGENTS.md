@@ -117,7 +117,7 @@ Current library files:
 
 - `bitify.circom`: `Num2Bits`, `Bits2Num`
 - `comparators.circom`: circomlib-style comparators such as `LessThan`, `GreaterEqThan`, `IsZero`, `IsEqual`
-- `poseidon.circom`: Poseidon component templates currently supporting one-input and two-input backends (`Poseidon(1)`, `Poseidon(2)`, `PoseidonEx(1, 1)`, `PoseidonEx(2, 1)`)
+- `poseidon.circom`: fixed `PoseidonEx(1, 1)` / `PoseidonEx(2, 1)` backends plus recursive `PoseidonEx(n, 1)` and `Poseidon(n)` wrappers for any compile-time `n > 0`
 
 When using these libraries, prefer standard component wiring. Example:
 

@@ -33,6 +33,7 @@ Thumbs.db
 .vscode/
 .idea/
 *.sublime-*
+.codex
 
 # Build artifacts
 *.a
