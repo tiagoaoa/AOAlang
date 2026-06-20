@@ -110,3 +110,41 @@ template GreaterEqThan(n) {
     lt.in[1] <== in[0]+1;
     lt.out ==> out;
 }
+
+// Horner-form bit reconstruction. Takes n boolean input bits (supplied by the
+// prover) and reconstructs the field element they encode using repeated doubling
+// (acc = acc + acc + bit) instead of the Sum(bit_i * 2^i) form, while enforcing
+// each input is boolean. circom2aoa lowers each constant-coefficient product
+// bit_i * 2^i as an explicit field multiplication, so the doubling form removes
+// ~n multiplications per decomposition (additions are free in the AOA backend).
+//
+// Bits are taken as inputs (not derived with `<--`) to match the zyga witness
+// model: aoac classifies `<--` outputs as declared private inputs that the
+// prover must supply anyway, so explicit named bit inputs keep the witness
+// interface stable instead of relying on mangled internal signal names.
+//
+// Used as a range check + comparison primitive: decomposing `a - b` into n bits
+// proves `a >= b` for n-bit operands (the difference is non-negative).
+template Bits2NumHorner(n) {
+    signal input bits[n];
+    signal output out;
+    signal acc[n];
+    var i;
+
+    // Use a named zero rather than the literal `0`: aoac miscompiles `x == 0`
+    // (it maps the literal 0 onto the constant-1 wire, enforcing `x == 1`), so
+    // booleanity must be asserted against a named zero signal.
+    signal zero;
+    zero <== 0;
+
+    for (i = 0; i < n; i++) {
+        bits[i] * (bits[i] - 1) === zero;
+    }
+
+    acc[n - 1] <== bits[n - 1];
+    for (i = n - 2; i >= 0; i--) {
+        acc[i] <== acc[i + 1] + acc[i + 1] + bits[i];
+    }
+
+    out <== acc[0];
+}
