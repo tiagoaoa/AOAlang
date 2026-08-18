@@ -1,7 +1,14 @@
 %{
 /*
- * AOA Lexer - Lexical analyzer for Arithmetic Optimization Algebra
- * Uses Flex (lex) for tokenization
+ * AOAlang - A compiler for AOA (Arithmetic Optimization Algebra) constraint files.
+ *
+ *
+ * File:
+ *     aoa.l
+ *
+ * Authors:
+ *     Tiago A.O.A. <tiagoaoa@cos.ufrj.br>
+ *
  */
 
 #include <stdio.h>
@@ -48,34 +55,29 @@ NEWLINE     \n|\r\n
 
     /* Literals */
 {INTEGER}   {
-                yylval.str_val = strdup(yytext);
-                return NUMBER;
+		yylval.str_val = strdup(yytext);
+		return NUMBER;
             }
 
 {FLOAT}     {
-                yylval.str_val = strdup(yytext);
-                return NUMBER;
+		yylval.str_val = strdup(yytext);
+		return NUMBER;
             }
 
-    /* Identifiers */
 {IDENTIFIER} {
-                yylval.str_val = strdup(yytext);
-                return IDENTIFIER;
+		yylval.str_val = strdup(yytext);
+		return IDENTIFIER;
             }
 
-    /* Comments - ignore everything after # */
-"#".*       { /* Single-line comment */ }
+"#".*       { /* comment, ignored to the end of the line */ }
 
-    /* Whitespace */
-{WHITESPACE} { /* Ignore spaces and tabs */ }
+{WHITESPACE} { /* ignored */ }
 
-    /* Newlines - significant for line-oriented parsing */
-{NEWLINE}   { return NEWLINE; }
+{NEWLINE}   { return NEWLINE; }	/* newlines are significant, parsing is line oriented */
 
-    /* Catch-all for invalid characters */
 .           {
-                error_report(yylineno, "Invalid character: '%s'", yytext);
-                return ERROR;
+		error_report(yylineno, "Invalid character: '%s'", yytext);
+		return ERROR;
             }
 
 %%
